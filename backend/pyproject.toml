@@ -10,5 +10,18 @@ dependencies = [
     "djangorestframework>=3.17.1",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-django>=4.9",
+    "ruff>=0.11",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.local"
+pythonpath = ["."]
+testpaths = ["."]
+python_files = ["test_*.py", "tests.py"]
+
 [tool.ruff]
 format.preview = true

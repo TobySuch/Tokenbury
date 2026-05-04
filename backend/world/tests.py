@@ -1,3 +1,9 @@
-from django.test import TestCase
+import pytest
 
-# Create your tests here.
+
+@pytest.mark.django_db
+def test_health_check(client):
+    response = client.get("/api/health/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
