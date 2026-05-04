@@ -1,0 +1,44 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        language: system
+        entry: bash -c 'cd backend && uv run ruff check .'
+        files: \.py$
+        pass_filenames: false
+
+      - id: ruff-format
+        name: ruff format
+        language: system
+        entry: bash -c 'cd backend && uv run ruff format --check .'
+        files: \.py$
+        pass_filenames: false
+
+      - id: eslint
+        name: eslint
+        language: system
+        entry: bash -c 'cd frontend && bun run lint'
+        files: \.(js|jsx)$
+        pass_filenames: false
+
+      - id: prettier
+        name: prettier
+        language: system
+        entry: bash -c 'cd frontend && bun run format'
+        files: \.(md|json|js|jsx|ts|tsx)$
+        pass_filenames: false
+
+      - id: pytest
+        name: pytest
+        language: system
+        entry: bash -c 'cd backend && uv run pytest'
+        pass_filenames: false
+        always_run: true
+
+      - id: vitest
+        name: vitest
+        language: system
+        entry: bash -c 'cd frontend && bun run test'
+        pass_filenames: false
+        always_run: true

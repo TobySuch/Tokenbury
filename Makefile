@@ -1,4 +1,4 @@
-.PHONY: dev backend frontend install migrate makemigrations shell createsuperuser lint format
+.PHONY: dev backend frontend install migrate makemigrations shell createsuperuser lint format test
 
 # ─── Dev Servers ─────────────────────────────────────────────────────────────
 
@@ -40,6 +40,14 @@ createsuperuser:
 lint:
 	cd backend && uv run ruff check .
 	cd frontend && bun run lint
+	cd frontend && bun run format:check
 
 format:
 	cd backend && uv run ruff format .
+	cd frontend && bun run format
+
+# ─── Tests ────────────────────────────────────────────────────────────────────
+
+test:
+	cd backend && uv run pytest
+	cd frontend && bun run test
