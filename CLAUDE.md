@@ -298,8 +298,8 @@ These are planned but not part of the initial build:
 - Postgres migration
 - Any form of user interaction beyond read-only viewing
 
-
 # Git Workflow
+
 - `main` branch is always deployable, contains production-ready code.
 - Use conventional commits for clear history and changelog generation. Scope should not be included.
 - Use pre-commit hooks for testing, linting and formatting (e.g. `ruff`, `eslint`, `prettier`).
