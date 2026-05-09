@@ -41,7 +41,7 @@ export default function TownView() {
 
   function handleMouseMove(e) {
     if (!naturalSize) return
-    const rect = imgRef.current.getBoundingClientRect()
+    const rect = e.currentTarget.getBoundingClientRect()
     const x = Math.round(((e.clientX - rect.left) / rect.width) * naturalSize.width)
     const y = Math.round(((e.clientY - rect.top) / rect.height) * naturalSize.height)
     setHoverCoords({ x, y })
@@ -52,15 +52,21 @@ export default function TownView() {
   }
 
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
+    <div
+      style={{
+        position: 'relative',
+        display: 'inline-block',
+        cursor: isDebug ? 'crosshair' : undefined,
+      }}
+      onMouseMove={isDebug ? handleMouseMove : undefined}
+      onMouseLeave={isDebug ? handleMouseLeave : undefined}
+    >
       <img
         ref={imgRef}
         src="/assets/map/town.png"
         alt="Tokenbury-on-Sea map"
-        style={{ display: 'block', maxWidth: '100%', cursor: isDebug ? 'crosshair' : 'default' }}
+        style={{ display: 'block', maxWidth: '100%' }}
         onLoad={handleImageLoad}
-        onMouseMove={isDebug ? handleMouseMove : undefined}
-        onMouseLeave={isDebug ? handleMouseLeave : undefined}
       />
       {isDebug &&
         naturalSize &&
@@ -84,7 +90,6 @@ export default function TownView() {
                 backgroundColor: fill,
                 border: `2px solid ${border}`,
                 boxSizing: 'border-box',
-                cursor: 'default',
               }}
             >
               <span
