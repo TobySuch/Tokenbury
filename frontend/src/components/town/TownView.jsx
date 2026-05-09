@@ -24,8 +24,10 @@ const BORDER_COLOURS = [
 ]
 
 export default function TownView() {
+  const isDebug = new URLSearchParams(window.location.search).get('debug') === '1'
   const [locations, setLocations] = useState([])
   const [naturalSize, setNaturalSize] = useState(null)
+  const [hoverCoords, setHoverCoords] = useState(null)
   const imgRef = useRef(null)
 
   useEffect(() => {
@@ -37,16 +39,31 @@ export default function TownView() {
     setNaturalSize({ width: img.naturalWidth, height: img.naturalHeight })
   }
 
+  function handleMouseMove(e) {
+    if (!naturalSize) return
+    const rect = imgRef.current.getBoundingClientRect()
+    const x = Math.round(((e.clientX - rect.left) / rect.width) * naturalSize.width)
+    const y = Math.round(((e.clientY - rect.top) / rect.height) * naturalSize.height)
+    setHoverCoords({ x, y })
+  }
+
+  function handleMouseLeave() {
+    setHoverCoords(null)
+  }
+
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
       <img
         ref={imgRef}
         src="/assets/map/town.png"
         alt="Tokenbury-on-Sea map"
-        style={{ display: 'block', maxWidth: '100%' }}
+        style={{ display: 'block', maxWidth: '100%', cursor: isDebug ? 'crosshair' : 'default' }}
         onLoad={handleImageLoad}
+        onMouseMove={isDebug ? handleMouseMove : undefined}
+        onMouseLeave={isDebug ? handleMouseLeave : undefined}
       />
-      {naturalSize &&
+      {isDebug &&
+        naturalSize &&
         locations.map((loc, i) => {
           const fill = FILL_COLOURS[i % FILL_COLOURS.length]
           const border = BORDER_COLOURS[i % BORDER_COLOURS.length]
@@ -88,6 +105,24 @@ export default function TownView() {
             </div>
           )
         })}
+      {isDebug && hoverCoords && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 6,
+            right: 8,
+            background: 'rgba(0,0,0,0.7)',
+            color: '#fff',
+            fontFamily: 'monospace',
+            fontSize: 12,
+            padding: '2px 6px',
+            borderRadius: 3,
+            pointerEvents: 'none',
+          }}
+        >
+          {hoverCoords.x}, {hoverCoords.y}
+        </div>
+      )}
     </div>
   )
 }
