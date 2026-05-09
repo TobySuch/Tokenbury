@@ -2,23 +2,19 @@ import { render, screen } from '@testing-library/react'
 import App from './App'
 
 beforeEach(() => {
-  globalThis.fetch = vi.fn(() =>
-    Promise.resolve({
-      json: () => Promise.resolve({ status: 'ok', message: 'Tokenbury is alive 🌊' }),
-    })
-  )
+  globalThis.fetch = vi.fn(() => Promise.resolve({ json: () => Promise.resolve([]) }))
 })
 
 afterEach(() => {
   vi.restoreAllMocks()
 })
 
-test('App renders without crashing', () => {
-  render(<App />)
-})
-
-test('App renders the connecting state before data loads', () => {
+test('App renders the page heading', () => {
   render(<App />)
   expect(screen.getByText('Tokenbury-on-Sea')).toBeInTheDocument()
-  expect(screen.getByText('Connecting...')).toBeInTheDocument()
+})
+
+test('App renders the town map image', () => {
+  render(<App />)
+  expect(screen.getByRole('img', { name: /tokenbury/i })).toBeInTheDocument()
 })
