@@ -77,11 +77,7 @@ export default function TownView() {
 
   return (
     <div
-      style={{
-        position: 'relative',
-        display: 'inline-block',
-        cursor: isDebug ? 'crosshair' : undefined,
-      }}
+      className={`relative w-full ${isDebug ? 'cursor-crosshair' : ''}`}
       onMouseMove={isDebug ? handleMouseMove : undefined}
       onMouseLeave={isDebug ? handleMouseLeave : undefined}
     >
@@ -89,7 +85,7 @@ export default function TownView() {
         ref={imgRef}
         src="/assets/map/town.png"
         alt="Tokenbury-on-Sea map"
-        style={{ display: 'block', maxWidth: '100%' }}
+        className="block w-full"
         onLoad={handleImageLoad}
       />
       {isDebug &&
@@ -105,29 +101,19 @@ export default function TownView() {
             <div
               key={loc.slug}
               title={loc.name}
+              className="absolute box-border"
               style={{
-                position: 'absolute',
                 left: `${left}%`,
                 top: `${top}%`,
                 width: `${width}%`,
                 height: `${height}%`,
                 backgroundColor: fill,
                 border: `2px solid ${border}`,
-                boxSizing: 'border-box',
               }}
             >
               <span
-                style={{
-                  position: 'absolute',
-                  bottom: 2,
-                  left: 4,
-                  right: 4,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: border,
-                  textShadow: '0 1px 2px rgba(0,0,0,0.85)',
-                  pointerEvents: 'none',
-                }}
+                className="pointer-events-none absolute bottom-0.5 left-1 right-1 text-[11px] font-bold"
+                style={{ color: border, textShadow: '0 1px 2px rgba(0,0,0,0.85)' }}
               >
                 {loc.name}
               </span>
@@ -135,20 +121,7 @@ export default function TownView() {
           )
         })}
       {isDebug && hoverCoords && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 6,
-            right: 8,
-            background: 'rgba(0,0,0,0.7)',
-            color: '#fff',
-            fontFamily: 'monospace',
-            fontSize: 12,
-            padding: '2px 6px',
-            borderRadius: 3,
-            pointerEvents: 'none',
-          }}
-        >
+        <div className="pointer-events-none absolute bottom-1.5 right-2 rounded bg-black/70 px-1.5 py-0.5 font-mono text-xs text-white">
           {hoverCoords.x}, {hoverCoords.y}
         </div>
       )}
