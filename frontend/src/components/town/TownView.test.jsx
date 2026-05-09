@@ -28,8 +28,17 @@ function mockFetch(data) {
   globalThis.fetch = vi.fn(() => Promise.resolve({ json: () => Promise.resolve(data) }))
 }
 
+function setDebugMode(on) {
+  Object.defineProperty(window, 'location', {
+    value: { ...window.location, search: on ? '?debug=1' : '' },
+    configurable: true,
+    writable: true,
+  })
+}
+
 afterEach(() => {
   vi.restoreAllMocks()
+  setDebugMode(false)
 })
 
 test('renders the map image', () => {
@@ -38,7 +47,8 @@ test('renders the map image', () => {
   expect(screen.getByRole('img', { name: /tokenbury/i })).toBeInTheDocument()
 })
 
-test('renders a bounding box for each location after image loads', async () => {
+test('renders a bounding box for each location after image loads in debug mode', async () => {
+  setDebugMode(true)
   mockFetch(LOCATIONS)
 
   await act(async () => {
@@ -57,7 +67,8 @@ test('renders a bounding box for each location after image loads', async () => {
   expect(screen.getByTitle('The Anchor')).toBeInTheDocument()
 })
 
-test('shows location names inside the bounding boxes', async () => {
+test('shows location names inside the bounding boxes in debug mode', async () => {
+  setDebugMode(true)
   mockFetch(LOCATIONS)
 
   await act(async () => {
@@ -77,6 +88,7 @@ test('shows location names inside the bounding boxes', async () => {
 })
 
 test('no bounding boxes rendered before image loads', async () => {
+  setDebugMode(true)
   mockFetch(LOCATIONS)
 
   await act(async () => {
@@ -84,4 +96,55 @@ test('no bounding boxes rendered before image loads', async () => {
   })
 
   expect(screen.queryByTitle('Harbour Café')).not.toBeInTheDocument()
+})
+
+test('no bounding boxes rendered without debug mode', async () => {
+  mockFetch(LOCATIONS)
+
+  await act(async () => {
+    render(<TownView />)
+  })
+
+  const img = screen.getByRole('img')
+  Object.defineProperty(img, 'naturalWidth', { value: 1000, configurable: true })
+  Object.defineProperty(img, 'naturalHeight', { value: 800, configurable: true })
+
+  await act(async () => {
+    fireEvent.load(img)
+  })
+
+  expect(screen.queryByTitle('Harbour Café')).not.toBeInTheDocument()
+  expect(screen.queryByTitle('The Anchor')).not.toBeInTheDocument()
+})
+
+test('shows coords on mouse move over image in debug mode', async () => {
+  setDebugMode(true)
+  mockFetch([])
+
+  await act(async () => {
+    render(<TownView />)
+  })
+
+  const img = screen.getByRole('img')
+  Object.defineProperty(img, 'naturalWidth', { value: 1000, configurable: true })
+  Object.defineProperty(img, 'naturalHeight', { value: 800, configurable: true })
+
+  await act(async () => {
+    fireEvent.load(img)
+  })
+
+  vi.spyOn(img, 'getBoundingClientRect').mockReturnValue({
+    left: 0,
+    top: 0,
+    width: 1000,
+    height: 800,
+    right: 1000,
+    bottom: 800,
+  })
+
+  await act(async () => {
+    fireEvent.mouseMove(img, { clientX: 100, clientY: 200 })
+  })
+
+  expect(screen.getByText('100, 200')).toBeInTheDocument()
 })
