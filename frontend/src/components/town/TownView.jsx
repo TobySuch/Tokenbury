@@ -97,11 +97,11 @@ export default function TownView() {
                   position: 'absolute',
                   bottom: 2,
                   left: 4,
+                  right: 4,
                   fontSize: 11,
                   fontWeight: 700,
                   color: border,
                   textShadow: '0 1px 2px rgba(0,0,0,0.85)',
-                  whiteSpace: 'nowrap',
                   pointerEvents: 'none',
                 }}
               >
