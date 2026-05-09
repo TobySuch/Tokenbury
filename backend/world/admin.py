@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from world.models import Location
+from world.models import Agent, Location
+
+
+@admin.register(Agent)
+class AgentAdmin(admin.ModelAdmin):
+    list_display = ("name", "active")
+    list_filter = ("active",)
 
 
 @admin.register(Location)
