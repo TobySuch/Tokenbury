@@ -133,7 +133,8 @@ test('shows coords on mouse move over image in debug mode', async () => {
     fireEvent.load(img)
   })
 
-  vi.spyOn(img, 'getBoundingClientRect').mockReturnValue({
+  const container = img.parentElement
+  vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({
     left: 0,
     top: 0,
     width: 1000,
@@ -143,7 +144,7 @@ test('shows coords on mouse move over image in debug mode', async () => {
   })
 
   await act(async () => {
-    fireEvent.mouseMove(img, { clientX: 100, clientY: 200 })
+    fireEvent.mouseMove(container, { clientX: 100, clientY: 200 })
   })
 
   expect(screen.getByText('100, 200')).toBeInTheDocument()
