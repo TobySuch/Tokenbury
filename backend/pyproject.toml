@@ -9,6 +9,7 @@ dependencies = [
     "django-cors-headers>=4.9.0",
     "djangorestframework>=3.17.1",
     "pillow>=12.2.0",
+    "python-dotenv>=1.0",
 ]
 
 [dependency-groups]

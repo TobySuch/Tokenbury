@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -14,6 +15,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "world",
+    "simulation",
 ]
 
 MIDDLEWARE = [
@@ -61,3 +63,7 @@ STATIC_URL = "/static/"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+LLM_MODEL = os.environ.get("LLM_MODEL", "anthropic/claude-haiku-4-5")
+TICK_INTERVAL_MINUTES = int(os.environ.get("TICK_INTERVAL_MINUTES", "15"))
