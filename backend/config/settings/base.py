@@ -54,6 +54,9 @@ DATABASES = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+TIME_ZONE = "UTC"
+USE_TZ = True
+
 STATIC_URL = "/static/"
 
 MEDIA_URL = "/media/"
