@@ -1,5 +1,5 @@
 import pytest
-from world.models import Location
+from world.models import Agent, AgentTick, Location, Tick
 
 
 @pytest.mark.django_db
@@ -46,3 +46,142 @@ def test_locations_returns_location(client):
 def test_location_str():
     loc = Location(name="The Pub")
     assert str(loc) == "The Pub"
+
+
+# --- helpers ---
+
+
+def make_agent(name="Margaret"):
+    return Agent.objects.create(
+        name=name,
+        bio="A retired teacher.",
+        sprite="sprites/margaret.png",
+        active=True,
+    )
+
+
+def make_location():
+    return Location.objects.create(
+        slug="harbour_cafe",
+        name="Harbour Café",
+        description="A cosy café.",
+        bbox_x1=0.0,
+        bbox_y1=0.0,
+        bbox_x2=100.0,
+        bbox_y2=100.0,
+    )
+
+
+def make_tick(in_game_time="2024-01-01T09:00:00Z"):
+    return Tick.objects.create(in_game_time=in_game_time)
+
+
+# --- Tick model ---
+
+
+@pytest.mark.django_db
+def test_tick_str():
+    tick = make_tick()
+    assert "Tick" in str(tick)
+
+
+# --- /api/ticks/ ---
+
+
+@pytest.mark.django_db
+def test_tick_list_empty(client):
+    response = client.get("/api/ticks/")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+@pytest.mark.django_db
+def test_tick_list_returns_ticks(client):
+    make_tick("2024-01-01T09:00:00Z")
+    make_tick("2024-01-01T10:00:00Z")
+    response = client.get("/api/ticks/")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 2
+    assert "in_game_time" in data[0]
+    assert "agent_states" not in data[0]
+
+
+# --- /api/ticks/<id>/ ---
+
+
+@pytest.mark.django_db
+def test_tick_detail_not_found(client):
+    response = client.get("/api/ticks/999/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_tick_detail_no_agents(client):
+    tick = make_tick()
+    response = client.get(f"/api/ticks/{tick.pk}/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == tick.pk
+    assert data["agent_states"] == []
+
+
+@pytest.mark.django_db
+def test_tick_detail_with_agent_state(client):
+    tick = make_tick()
+    agent = make_agent()
+    location = make_location()
+    AgentTick.objects.create(
+        agent=agent,
+        tick=tick,
+        location=location,
+        activity="Having coffee",
+        inner_thought="Feeling peaceful",
+        mood="content",
+    )
+    response = client.get(f"/api/ticks/{tick.pk}/")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["agent_states"]) == 1
+    state = data["agent_states"][0]
+    assert state["agent_name"] == "Margaret"
+    assert state["location_slug"] == "harbour_cafe"
+    assert state["activity"] == "Having coffee"
+    assert state["mood"] == "content"
+    assert state["inner_thought"] == "Feeling peaceful"
+
+
+@pytest.mark.django_db
+def test_tick_detail_null_location(client):
+    tick = make_tick()
+    agent = make_agent()
+    AgentTick.objects.create(
+        agent=agent,
+        tick=tick,
+        location=None,
+        activity="Wandering",
+        inner_thought="Lost in thought",
+        mood="pensive",
+    )
+    response = client.get(f"/api/ticks/{tick.pk}/")
+    assert response.status_code == 200
+    state = response.json()["agent_states"][0]
+    assert state["location_slug"] is None
+
+
+# --- /api/ticks/latest/ ---
+
+
+@pytest.mark.django_db
+def test_tick_latest_not_found(client):
+    response = client.get("/api/ticks/latest/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_tick_latest_returns_most_recent(client):
+    make_tick("2024-01-01T08:00:00Z")
+    latest = make_tick("2024-01-01T10:00:00Z")
+    response = client.get("/api/ticks/latest/")
+    assert response.status_code == 200
+    assert response.json()["id"] == latest.pk
