@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { fetchLocations } from '../../api/client'
+import { fetchLocations, fetchLatestTick } from '../../api/client'
+import AgentSprite from '../agents/AgentSprite'
 
 const FILL_COLOURS = [
   'rgba(239,68,68,0.35)',
@@ -50,12 +51,24 @@ const BORDER_COLOURS = [
 export default function TownView() {
   const isDebug = new URLSearchParams(window.location.search).get('debug') === '1'
   const [locations, setLocations] = useState([])
+  const [agentsByLocation, setAgentsByLocation] = useState(new Map())
   const [naturalSize, setNaturalSize] = useState(null)
   const [hoverCoords, setHoverCoords] = useState(null)
   const imgRef = useRef(null)
 
   useEffect(() => {
-    fetchLocations().then(setLocations)
+    Promise.all([fetchLocations(), fetchLatestTick()]).then(([locs, tick]) => {
+      setLocations(locs)
+      if (tick?.agent_states) {
+        const byLoc = new Map()
+        for (const state of tick.agent_states) {
+          if (!state.location_slug) continue
+          if (!byLoc.has(state.location_slug)) byLoc.set(state.location_slug, [])
+          byLoc.get(state.location_slug).push(state)
+        }
+        setAgentsByLocation(byLoc)
+      }
+    })
   }, [])
 
   function handleImageLoad() {
@@ -120,6 +133,28 @@ export default function TownView() {
             </div>
           )
         })}
+      {naturalSize &&
+        locations
+          .filter((loc) => agentsByLocation.has(loc.slug))
+          .map((loc) => {
+            const cx = ((loc.bbox_x1 + loc.bbox_x2) / 2 / naturalSize.width) * 100
+            const cy = ((loc.bbox_y1 + loc.bbox_y2) / 2 / naturalSize.height) * 100
+            return (
+              <div
+                key={loc.slug}
+                className="absolute flex gap-1 transition-all duration-[2000ms]"
+                style={{ left: `${cx}%`, top: `${cy}%`, transform: 'translate(-50%, -50%)' }}
+              >
+                {agentsByLocation.get(loc.slug).map((a) => (
+                  <AgentSprite
+                    key={a.agent_id}
+                    name={a.agent_name}
+                    spriteUrl={a.agent_sprite_url}
+                  />
+                ))}
+              </div>
+            )
+          })}
       {isDebug && hoverCoords && (
         <div className="pointer-events-none absolute bottom-1.5 right-2 rounded bg-black/70 px-1.5 py-0.5 font-mono text-xs text-white">
           {hoverCoords.x}, {hoverCoords.y}

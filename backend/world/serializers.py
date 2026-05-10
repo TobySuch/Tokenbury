@@ -20,15 +20,22 @@ class LocationSerializer(serializers.ModelSerializer):
 class AgentTickSerializer(serializers.ModelSerializer):
     agent_id = serializers.IntegerField(source="agent.id")
     agent_name = serializers.CharField(source="agent.name")
+    agent_sprite_url = serializers.SerializerMethodField()
     location_slug = serializers.SlugRelatedField(
         source="location", slug_field="slug", read_only=True
     )
+
+    def get_agent_sprite_url(self, obj):
+        if obj.agent.sprite:
+            return obj.agent.sprite.url
+        return None
 
     class Meta:
         model = AgentTick
         fields = [
             "agent_id",
             "agent_name",
+            "agent_sprite_url",
             "location_slug",
             "activity",
             "mood",
