@@ -48,12 +48,15 @@ const BORDER_COLOURS = [
   'rgb(202,138,4)',
 ]
 
-export default function TownView() {
+export default function TownView({ onAgentChange }) {
   const isDebug = new URLSearchParams(window.location.search).get('debug') === '1'
   const [locations, setLocations] = useState([])
   const [agentsByLocation, setAgentsByLocation] = useState(new Map())
   const [naturalSize, setNaturalSize] = useState(null)
   const [hoverCoords, setHoverCoords] = useState(null)
+  const [hoveredAgent, setHoveredAgent] = useState(null)
+  const [lockedAgent, setLockedAgent] = useState(null)
+  const lockedAgentRef = useRef(null)
   const imgRef = useRef(null)
 
   useEffect(() => {
@@ -67,9 +70,37 @@ export default function TownView() {
           byLoc.get(state.location_slug).push(state)
         }
         setAgentsByLocation(byLoc)
+        if (lockedAgentRef.current) {
+          const updated = tick.agent_states.find(
+            (s) => s.agent_id === lockedAgentRef.current.agent_id
+          )
+          if (updated) {
+            const locName = locs.find((l) => l.slug === updated.location_slug)?.name
+            const enriched = { ...updated, location_name: locName }
+            setLockedAgent(enriched)
+            lockedAgentRef.current = enriched
+            onAgentChange?.(enriched)
+          }
+        }
       }
     })
   }, [])
+
+  function handleSpriteHover(agent) {
+    setHoveredAgent(agent)
+    onAgentChange?.(agent)
+  }
+
+  function handleSpriteHoverEnd() {
+    setHoveredAgent(null)
+    onAgentChange?.(lockedAgentRef.current)
+  }
+
+  function handleSpriteClick(agent) {
+    setLockedAgent(agent)
+    lockedAgentRef.current = agent
+    onAgentChange?.(agent)
+  }
 
   function handleImageLoad() {
     const img = imgRef.current
@@ -150,6 +181,10 @@ export default function TownView() {
                     key={a.agent_id}
                     name={a.agent_name}
                     spriteUrl={a.agent_sprite_url}
+                    isActive={a.agent_id === (hoveredAgent?.agent_id ?? lockedAgent?.agent_id)}
+                    onHover={() => handleSpriteHover({ ...a, location_name: loc.name })}
+                    onHoverEnd={handleSpriteHoverEnd}
+                    onClick={() => handleSpriteClick({ ...a, location_name: loc.name })}
                   />
                 ))}
               </div>
