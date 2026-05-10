@@ -58,32 +58,50 @@ export default function TownView({ onAgentChange }) {
   const [lockedAgent, setLockedAgent] = useState(null)
   const lockedAgentRef = useRef(null)
   const imgRef = useRef(null)
+  const currentTickIdRef = useRef(null)
+  const locationsRef = useRef([])
+
+  function applyTick(tick, locs) {
+    if (!tick?.agent_states) return
+    currentTickIdRef.current = tick.id
+    const byLoc = new Map()
+    for (const state of tick.agent_states) {
+      if (!state.location_slug) continue
+      if (!byLoc.has(state.location_slug)) byLoc.set(state.location_slug, [])
+      byLoc.get(state.location_slug).push(state)
+    }
+    setAgentsByLocation(byLoc)
+    if (lockedAgentRef.current) {
+      const updated = tick.agent_states.find((s) => s.agent_id === lockedAgentRef.current.agent_id)
+      if (updated) {
+        const locName = locs.find((l) => l.slug === updated.location_slug)?.name
+        const enriched = { ...updated, location_name: locName }
+        setLockedAgent(enriched)
+        lockedAgentRef.current = enriched
+        onAgentChange?.(enriched)
+      }
+    }
+  }
 
   useEffect(() => {
     Promise.all([fetchLocations(), fetchLatestTick()]).then(([locs, tick]) => {
       setLocations(locs)
-      if (tick?.agent_states) {
-        const byLoc = new Map()
-        for (const state of tick.agent_states) {
-          if (!state.location_slug) continue
-          if (!byLoc.has(state.location_slug)) byLoc.set(state.location_slug, [])
-          byLoc.get(state.location_slug).push(state)
-        }
-        setAgentsByLocation(byLoc)
-        if (lockedAgentRef.current) {
-          const updated = tick.agent_states.find(
-            (s) => s.agent_id === lockedAgentRef.current.agent_id
-          )
-          if (updated) {
-            const locName = locs.find((l) => l.slug === updated.location_slug)?.name
-            const enriched = { ...updated, location_name: locName }
-            setLockedAgent(enriched)
-            lockedAgentRef.current = enriched
-            onAgentChange?.(enriched)
-          }
-        }
-      }
+      locationsRef.current = locs
+      if (tick) applyTick(tick, locs)
     })
+  }, [])
+
+  useEffect(() => {
+    locationsRef.current = locations
+  }, [locations])
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchLatestTick(currentTickIdRef.current).then((tick) => {
+        if (tick) applyTick(tick, locationsRef.current)
+      })
+    }, 30_000)
+    return () => clearInterval(id)
   }, [])
 
   function handleSpriteHover(agent) {

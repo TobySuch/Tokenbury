@@ -38,9 +38,19 @@ def tick_detail(request, pk):
 
 @api_view(["GET"])
 def tick_latest(request):
+    latest = Tick.objects.only("id").first()
+    if latest is None:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    last_tick_id = request.query_params.get("last_tick_id")
+    if last_tick_id is not None:
+        try:
+            if int(last_tick_id) == latest.id:
+                return Response(status=status.HTTP_304_NOT_MODIFIED)
+        except ValueError:
+            pass
+
     tick = Tick.objects.prefetch_related(
         "agent_states__agent", "agent_states__location"
-    ).first()
-    if tick is None:
-        return Response(status=status.HTTP_404_NOT_FOUND)
+    ).get(pk=latest.id)
     return Response(TickDetailSerializer(tick).data)

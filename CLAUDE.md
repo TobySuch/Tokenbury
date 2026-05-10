@@ -165,11 +165,13 @@ Vite proxies all `/api/*` requests to Django, so the frontend never needs to kno
 # Frontend (Vitest — must use bun run test, not bun test directly)
 cd frontend && bun run test
 
-# Backend (Django test runner)
-cd backend && uv run python manage.py test
+# Backend (pytest-django — must use uv run pytest, not manage.py test)
+cd backend && uv run pytest
 ```
 
 > **Note:** Running `bun test` directly invokes Bun's own test runner, which doesn't honour the Vitest globals config. Always use `bun run test` to go through the `package.json` script.
+
+> **Note:** Backend tests use pytest with `pytest-django` markers (`@pytest.mark.django_db`). Django's own `manage.py test` runner won't discover them — always use `uv run pytest`.
 
 ---
 

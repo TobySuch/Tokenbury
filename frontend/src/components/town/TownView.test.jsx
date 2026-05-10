@@ -178,3 +178,94 @@ test('agents with no location_slug are skipped', async () => {
   await renderWithImageLoad({ locations: LOCATIONS, tick: tickWithNullLoc })
   expect(screen.queryByAltText('Margaret')).not.toBeInTheDocument()
 })
+
+describe('polling', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function mockFetchForPolling(initialTick, subsequentTick) {
+    let tickCallCount = 0
+    globalThis.fetch = vi.fn((url) => {
+      if (url === '/api/locations/') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(LOCATIONS) })
+      }
+      tickCallCount++
+      if (tickCallCount === 1) {
+        return Promise.resolve({
+          status: 200,
+          ok: true,
+          json: () => Promise.resolve(initialTick),
+        })
+      }
+      return Promise.resolve(subsequentTick)
+    })
+  }
+
+  async function renderAndLoad(initialTick, subsequentTick) {
+    mockFetchForPolling(initialTick, subsequentTick)
+    await act(async () => {
+      render(<TownView />)
+    })
+    const img = screen.getByRole('img', { name: /tokenbury/i })
+    Object.defineProperty(img, 'naturalWidth', { value: 1000, configurable: true })
+    Object.defineProperty(img, 'naturalHeight', { value: 800, configurable: true })
+    await act(async () => {
+      fireEvent.load(img)
+    })
+    return img
+  }
+
+  test('polls for latest tick after 30 seconds', async () => {
+    await renderAndLoad(TICK_WITH_AGENTS, { status: 304, ok: false })
+    const callsBefore = fetch.mock.calls.length
+
+    await act(async () => {
+      vi.advanceTimersByTime(30_000)
+    })
+
+    expect(fetch.mock.calls.length).toBeGreaterThan(callsBefore)
+  })
+
+  test('poll sends last_tick_id from the loaded tick', async () => {
+    await renderAndLoad(TICK_WITH_AGENTS, { status: 304, ok: false })
+
+    await act(async () => {
+      vi.advanceTimersByTime(30_000)
+    })
+
+    const pollCalls = fetch.mock.calls.filter(([url]) =>
+      url.includes(`last_tick_id=${TICK_WITH_AGENTS.id}`)
+    )
+    expect(pollCalls.length).toBeGreaterThan(0)
+  })
+
+  test('updates agents when poll returns a new tick', async () => {
+    const newTick = {
+      id: 2,
+      in_game_time: '2026-05-10T10:00:00Z',
+      created_at: '2026-05-10T10:01:00Z',
+      agent_states: [{ ...TICK_WITH_AGENTS.agent_states[0], location_slug: 'pub' }],
+    }
+    await renderAndLoad(TICK_WITH_AGENTS, {
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve(newTick),
+    })
+
+    expect(screen.getByAltText('Margaret')).toBeInTheDocument()
+    expect(screen.getByText('D')).toBeInTheDocument()
+
+    await act(async () => {
+      vi.advanceTimersByTime(30_000)
+    })
+    await act(async () => {})
+
+    expect(screen.getByAltText('Margaret')).toBeInTheDocument()
+    expect(screen.queryByText('D')).not.toBeInTheDocument()
+  })
+})

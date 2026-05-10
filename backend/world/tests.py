@@ -185,3 +185,32 @@ def test_tick_latest_returns_most_recent(client):
     response = client.get("/api/ticks/latest/")
     assert response.status_code == 200
     assert response.json()["id"] == latest.pk
+
+
+@pytest.mark.django_db
+def test_tick_latest_304_when_id_matches(client):
+    tick = make_tick()
+    response = client.get(f"/api/ticks/latest/?last_tick_id={tick.pk}")
+    assert response.status_code == 304
+
+
+@pytest.mark.django_db
+def test_tick_latest_200_when_id_differs(client):
+    old_tick = make_tick("2024-01-01T08:00:00Z")
+    latest = make_tick("2024-01-01T10:00:00Z")
+    response = client.get(f"/api/ticks/latest/?last_tick_id={old_tick.pk}")
+    assert response.status_code == 200
+    assert response.json()["id"] == latest.pk
+
+
+@pytest.mark.django_db
+def test_tick_latest_200_when_id_invalid(client):
+    make_tick()
+    response = client.get("/api/ticks/latest/?last_tick_id=notanint")
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_tick_latest_404_when_no_ticks_regardless_of_param(client):
+    response = client.get("/api/ticks/latest/?last_tick_id=1")
+    assert response.status_code == 404
