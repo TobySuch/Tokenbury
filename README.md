@@ -10,7 +10,7 @@ Inspired by [Generative Agents: Interactive Simulacra of Human Behavior](https:/
 
 - **Backend** — Python 3.14, Django, Django REST Framework, Django Channels
 - **Frontend** — React, Vite, Tailwind CSS, Zustand
-- **LLM** — Claude Haiku via OpenRouter
+- **LLM** — Any LLM on OpenRouter
 - **Database** — SQLite (development) → Postgres (production)
 
 ## Getting Started
@@ -28,6 +28,23 @@ git clone <repo>
 cd tokenbury
 make install
 ```
+
+Copy the example env file and add your OpenRouter API key:
+
+```bash
+cp backend/.env.example backend/.env
+# then edit backend/.env and set OPENROUTER_API_KEY
+```
+
+Get an API key at [openrouter.ai/keys](https://openrouter.ai/keys).
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `OPENROUTER_API_KEY` | Yes | — | Your OpenRouter API key |
+| `LLM_MODEL` | No | `anthropic/claude-haiku-4-5` | Model to use for agent generation |
+| `TICK_INTERVAL_MINUTES` | No | `15` | How many minutes of in-game time each tick advances |
 
 ### Running
 

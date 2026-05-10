@@ -1,4 +1,4 @@
-.PHONY: dev backend frontend install migrate makemigrations shell createsuperuser lint format test
+.PHONY: dev backend frontend install migrate makemigrations shell createsuperuser lint format test ticker
 
 # ─── Dev Servers ─────────────────────────────────────────────────────────────
 
@@ -34,6 +34,11 @@ shell:
 
 createsuperuser:
 	cd backend && uv run python manage.py createsuperuser
+
+# ─── Simulation ───────────────────────────────────────────────────────────────
+
+ticker:
+	cd backend && uv run python manage.py run_ticker
 
 # ─── Code Quality ─────────────────────────────────────────────────────────────
 
