@@ -90,7 +90,7 @@ export default function TownView() {
 
   return (
     <div
-      className={`relative w-full ${isDebug ? 'cursor-crosshair' : ''}`}
+      className={`relative w-full overflow-hidden rounded-2xl shadow-md ${isDebug ? 'cursor-crosshair' : ''}`}
       onMouseMove={isDebug ? handleMouseMove : undefined}
       onMouseLeave={isDebug ? handleMouseLeave : undefined}
     >
