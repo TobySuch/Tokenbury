@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { fetchLocations, fetchLatestTick } from '../../api/client'
 import AgentSprite from '../agents/AgentSprite'
 
@@ -61,27 +61,32 @@ export default function TownView({ onAgentChange }) {
   const currentTickIdRef = useRef(null)
   const locationsRef = useRef([])
 
-  function applyTick(tick, locs) {
-    if (!tick?.agent_states) return
-    currentTickIdRef.current = tick.id
-    const byLoc = new Map()
-    for (const state of tick.agent_states) {
-      if (!state.location_slug) continue
-      if (!byLoc.has(state.location_slug)) byLoc.set(state.location_slug, [])
-      byLoc.get(state.location_slug).push(state)
-    }
-    setAgentsByLocation(byLoc)
-    if (lockedAgentRef.current) {
-      const updated = tick.agent_states.find((s) => s.agent_id === lockedAgentRef.current.agent_id)
-      if (updated) {
-        const locName = locs.find((l) => l.slug === updated.location_slug)?.name
-        const enriched = { ...updated, location_name: locName }
-        setLockedAgent(enriched)
-        lockedAgentRef.current = enriched
-        onAgentChange?.(enriched)
+  const applyTick = useCallback(
+    function applyTick(tick, locs) {
+      if (!tick?.agent_states) return
+      currentTickIdRef.current = tick.id
+      const byLoc = new Map()
+      for (const state of tick.agent_states) {
+        if (!state.location_slug) continue
+        if (!byLoc.has(state.location_slug)) byLoc.set(state.location_slug, [])
+        byLoc.get(state.location_slug).push(state)
       }
-    }
-  }
+      setAgentsByLocation(byLoc)
+      if (lockedAgentRef.current) {
+        const updated = tick.agent_states.find(
+          (s) => s.agent_id === lockedAgentRef.current.agent_id
+        )
+        if (updated) {
+          const locName = locs.find((l) => l.slug === updated.location_slug)?.name
+          const enriched = { ...updated, location_name: locName }
+          setLockedAgent(enriched)
+          lockedAgentRef.current = enriched
+          onAgentChange?.(enriched)
+        }
+      }
+    },
+    [onAgentChange]
+  )
 
   useEffect(() => {
     Promise.all([fetchLocations(), fetchLatestTick()]).then(([locs, tick]) => {
@@ -89,7 +94,7 @@ export default function TownView({ onAgentChange }) {
       locationsRef.current = locs
       if (tick) applyTick(tick, locs)
     })
-  }, [])
+  }, [applyTick])
 
   useEffect(() => {
     locationsRef.current = locations
@@ -102,7 +107,7 @@ export default function TownView({ onAgentChange }) {
       })
     }, 30_000)
     return () => clearInterval(id)
-  }, [])
+  }, [applyTick])
 
   function handleSpriteHover(agent) {
     setHoveredAgent(agent)
