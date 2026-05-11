@@ -12,8 +12,16 @@ def build_agent_prompt(
     previous_agent_ticks: list["AgentTick"],
     world_state: list[dict],
     locations: list["Location"],
+    daily_plan: list[str] | None = None,
+    needs_plan: bool = False,
 ) -> str:
     location_slugs = ", ".join(loc.slug for loc in locations)
+
+    if daily_plan is not None:
+        plan_lines = "\n".join(f"  - {item}" for item in daily_plan)
+        plan_section = f"## Your Plan for Today\n{plan_lines}\n\n"
+    else:
+        plan_section = ""
 
     if previous_agent_ticks:
         history_lines = []
@@ -36,6 +44,15 @@ def build_agent_prompt(
     else:
         world_section = "## Current World State\nYou are the only one around."
 
+    if needs_plan:
+        plan_field = (
+            '\n- "daily_plan": a list of 3 to 6 intentions for the rest of today, each with a '
+            "rough time prefix in HH:MM format "
+            '(e.g. "08:00 — Have breakfast at the harbour café", "14:00 — Call in on Bernard")'
+        )
+    else:
+        plan_field = ""
+
     return f"""You are simulating a resident of Tokenbury-on-Sea, a sleepy English coastal town. \
 You have a distinct personality, daily routine, and inner life. Act consistently with your character.
 
@@ -46,7 +63,7 @@ Bio: {agent.bio}
 ## Current Time
 {tick.in_game_time.strftime("%A, %d %B %Y at %H:%M")}
 
-{history_section}
+{plan_section}{history_section}
 
 {world_section}
 
@@ -58,4 +75,4 @@ Respond with only a JSON object with these fields:
 - "location": one of the valid location slugs above
 - "activity": a short description of what you are doing (one sentence)
 - "inner_thought": your private inner thought in first person
-- "mood": one word describing your current mood"""
+- "mood": one word describing your current mood{plan_field}"""

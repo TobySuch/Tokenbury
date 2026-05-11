@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from world.models import Agent, AgentTick, Location, Tick
+from world.models import Agent, AgentTick, DailyPlan, Location, Tick
 
 
 @admin.register(Agent)
@@ -26,3 +26,10 @@ class AgentTickAdmin(admin.ModelAdmin):
     list_display = ("agent", "tick", "location", "mood")
     list_filter = ("tick", "mood")
     raw_id_fields = ("agent", "tick", "location")
+
+
+@admin.register(DailyPlan)
+class DailyPlanAdmin(admin.ModelAdmin):
+    list_display = ("agent", "date", "generated_at_tick")
+    list_filter = ("date",)
+    raw_id_fields = ("agent", "generated_at_tick")

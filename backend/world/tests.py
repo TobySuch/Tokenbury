@@ -1,5 +1,5 @@
 import pytest
-from world.models import Agent, AgentTick, Location, Tick
+from world.models import Agent, AgentTick, DailyPlan, Location, Tick
 
 
 @pytest.mark.django_db
@@ -83,6 +83,19 @@ def make_tick(in_game_time="2024-01-01T09:00:00Z", active=False):
 def test_tick_str():
     tick = make_tick()
     assert "Tick" in str(tick)
+
+
+@pytest.mark.django_db
+def test_daily_plan_str():
+    agent = make_agent()
+    tick = make_tick()
+    plan = DailyPlan.objects.create(
+        agent=agent,
+        date="2024-01-01",
+        plan=["Have breakfast"],
+        generated_at_tick=tick,
+    )
+    assert str(plan) == "Margaret's plan for 2024-01-01"
 
 
 # --- /api/ticks/ ---

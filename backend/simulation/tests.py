@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.utils import timezone as tz
 
-from world.models import Agent, AgentTick, Location, Tick
+from world.models import Agent, AgentTick, DailyPlan, Location, Tick
 
 from simulation.llm import LLMError, call_llm
 from simulation.prompts import build_agent_prompt
@@ -60,6 +60,18 @@ VALID_LLM_RESPONSE = json.dumps({
     "activity": "Reading the newspaper",
     "inner_thought": "I wonder if the boats are back.",
     "mood": "peaceful",
+})
+
+VALID_LLM_RESPONSE_WITH_PLAN = json.dumps({
+    "location": "harbour_cafe",
+    "activity": "Reading the newspaper",
+    "inner_thought": "I wonder if the boats are back.",
+    "mood": "peaceful",
+    "daily_plan": [
+        "08:00 — Have breakfast at the harbour café",
+        "11:00 — Visit Margaret at her cottage",
+        "13:00 — Pick up a newspaper from the corner shop",
+    ],
 })
 
 FENCED_LLM_RESPONSE = f"```json\n{VALID_LLM_RESPONSE}\n```"
@@ -374,3 +386,106 @@ def test_run_tick_stores_raw_prompt_and_response(_mock):
     at = AgentTick.objects.get(tick=tick)
     assert len(at.raw_prompt) > 0
     assert at.raw_response == VALID_LLM_RESPONSE
+
+
+# --- daily plan tests ---
+
+
+@pytest.mark.django_db
+@patch("simulation.runner.call_llm", return_value=VALID_LLM_RESPONSE_WITH_PLAN)
+def test_plan_generated_on_first_morning_tick(_mock, settings):
+    settings.PLAN_HOUR = 6
+    make_location()
+    agent = make_agent()
+    morning_time = tz.now().replace(hour=7, minute=0, second=0, microsecond=0)
+    Tick.objects.create(in_game_time=morning_time - timedelta(minutes=15))
+    run_tick()
+    plan = DailyPlan.objects.filter(agent=agent).first()
+    assert plan is not None
+    assert plan.date == (morning_time + timedelta(minutes=15)).date()
+    assert plan.plan == [
+        "08:00 — Have breakfast at the harbour café",
+        "11:00 — Visit Margaret at her cottage",
+        "13:00 — Pick up a newspaper from the corner shop",
+    ]
+
+
+@pytest.mark.django_db
+@patch("simulation.runner.call_llm", return_value=VALID_LLM_RESPONSE_WITH_PLAN)
+def test_plan_not_generated_before_plan_hour(_mock, settings):
+    settings.PLAN_HOUR = 6
+    make_location()
+    make_agent()
+    # Tick at 05:30 — before PLAN_HOUR
+    early_time = tz.now().replace(hour=5, minute=15, second=0, microsecond=0)
+    Tick.objects.create(in_game_time=early_time)
+    run_tick()
+    assert DailyPlan.objects.count() == 0
+
+
+@pytest.mark.django_db
+@patch("simulation.runner.call_llm", return_value=VALID_LLM_RESPONSE_WITH_PLAN)
+def test_plan_not_regenerated_when_one_exists(_mock, settings):
+    settings.PLAN_HOUR = 6
+    make_location()
+    agent = make_agent()
+    morning_time = tz.now().replace(hour=7, minute=0, second=0, microsecond=0)
+    prior_tick = Tick.objects.create(in_game_time=morning_time, active=True)
+    DailyPlan.objects.create(
+        agent=agent,
+        date=morning_time.date(),
+        plan=["Existing plan item"],
+        generated_at_tick=prior_tick,
+    )
+    Tick.objects.create(in_game_time=morning_time + timedelta(minutes=15))
+    run_tick()
+    assert DailyPlan.objects.filter(agent=agent).count() == 1
+
+
+@pytest.mark.django_db
+def test_existing_plan_injected_into_prompt():
+    agent = make_agent()
+    tick = make_tick()
+    location = make_location()
+    plan = ["Buy fish from the harbour", "Visit Margaret"]
+    prompt = build_agent_prompt(agent, tick, [], [], [location], daily_plan=plan)
+    assert "Buy fish from the harbour" in prompt
+    assert "Visit Margaret" in prompt
+    assert "Your Plan for Today" in prompt
+
+
+@pytest.mark.django_db
+def test_needs_plan_adds_daily_plan_to_instructions():
+    agent = make_agent()
+    tick = make_tick()
+    location = make_location()
+    prompt = build_agent_prompt(agent, tick, [], [], [location], needs_plan=True)
+    assert "daily_plan" in prompt
+
+
+@pytest.mark.django_db
+def test_no_plan_section_when_plan_is_none():
+    agent = make_agent()
+    tick = make_tick()
+    location = make_location()
+    prompt = build_agent_prompt(agent, tick, [], [], [location])
+    assert "Your Plan for Today" not in prompt
+
+
+@pytest.mark.django_db
+@patch("simulation.runner.call_llm")
+def test_plan_gracefully_skipped_on_invalid_llm_output(mock_llm, settings):
+    settings.PLAN_HOUR = 6
+    make_location()
+    make_agent()
+    mock_llm.return_value = json.dumps({
+        "location": "harbour_cafe",
+        "activity": "Wandering",
+        "inner_thought": "Hmm.",
+        "mood": "confused",
+        "daily_plan": "not a list",
+    })
+    morning_time = tz.now().replace(hour=7, minute=0, second=0, microsecond=0)
+    Tick.objects.create(in_game_time=morning_time)
+    run_tick()
+    assert DailyPlan.objects.count() == 0

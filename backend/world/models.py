@@ -60,3 +60,20 @@ class AgentTick(models.Model):
 
     def __str__(self):
         return f"{self.agent.name} @ tick {self.tick_id}"
+
+
+class DailyPlan(models.Model):
+    agent = models.ForeignKey(
+        Agent, on_delete=models.CASCADE, related_name="daily_plans"
+    )
+    date = models.DateField()
+    plan = models.JSONField()
+    generated_at_tick = models.ForeignKey(
+        Tick, on_delete=models.SET_NULL, null=True, related_name="daily_plans"
+    )
+
+    class Meta:
+        unique_together = [("agent", "date")]
+
+    def __str__(self):
+        return f"{self.agent.name}'s plan for {self.date}"
