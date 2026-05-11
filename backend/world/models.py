@@ -51,8 +51,8 @@ class AgentTick(models.Model):
     activity = models.TextField()
     inner_thought = models.TextField()
     mood = models.CharField(max_length=100, blank=True)
-    raw_prompt = models.TextField(blank=True)
-    raw_response = models.TextField(blank=True)
+    raw_prompts = models.JSONField(default=dict, blank=True)
+    raw_responses = models.JSONField(default=dict, blank=True)
 
     class Meta:
         unique_together = [("agent", "tick")]
