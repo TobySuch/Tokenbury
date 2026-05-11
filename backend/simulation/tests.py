@@ -8,8 +8,9 @@ from django.utils import timezone as tz
 from world.models import Agent, AgentTick, DailyPlan, Location, Tick
 
 from simulation.llm import LLMError, call_llm
-from simulation.prompts import build_agent_prompt
-from simulation.runner import _extract_json, _normalise, run_tick
+from simulation.pipeline import TickContext, _extract_json, _normalise
+from simulation.prompts import build_activity_prompt, build_location_prompt
+from simulation.runner import run_tick
 
 
 # --- factories ---
@@ -55,8 +56,12 @@ def make_agent_tick(
     )
 
 
+# Two-phase response fixtures.
+# Using a combined response so both phases can parse from the same mock value —
+# each phase just picks the fields it needs and ignores the rest.
 VALID_LLM_RESPONSE = json.dumps({
     "location": "harbour_cafe",
+    "intention": "Having a quiet coffee and reading the morning paper",
     "activity": "Reading the newspaper",
     "inner_thought": "I wonder if the boats are back.",
     "mood": "peaceful",
@@ -64,6 +69,7 @@ VALID_LLM_RESPONSE = json.dumps({
 
 VALID_LLM_RESPONSE_WITH_PLAN = json.dumps({
     "location": "harbour_cafe",
+    "intention": "Having a quiet coffee and reading the morning paper",
     "activity": "Reading the newspaper",
     "inner_thought": "I wonder if the boats are back.",
     "mood": "peaceful",
@@ -75,6 +81,13 @@ VALID_LLM_RESPONSE_WITH_PLAN = json.dumps({
 })
 
 FENCED_LLM_RESPONSE = f"```json\n{VALID_LLM_RESPONSE}\n```"
+
+
+def two_phase_responses(n_agents=1, phase1=None, phase2=None):
+    """Build a side_effect list for n agents × 2 phases."""
+    p1 = phase1 or VALID_LLM_RESPONSE
+    p2 = phase2 or VALID_LLM_RESPONSE
+    return [p1] * n_agents + [p2] * n_agents
 
 
 # --- _normalise tests ---
@@ -140,20 +153,71 @@ def test_extract_json_returns_original_when_no_braces():
     assert _extract_json("not json at all") == "not json at all"
 
 
-# --- prompt tests ---
+# --- TickContext tests ---
 
 
 @pytest.mark.django_db
-def test_prompt_contains_agent_bio():
+def test_tick_context_co_located_groups_by_resolved_location():
+    loc_a = make_location(slug="harbour_cafe", name="Harbour Café")
+    loc_b = make_location(slug="pub", name="The Pub")
+    tick = make_tick()
+    agent1 = make_agent("Margaret")
+    agent2 = make_agent("Bernard")
+    agent3 = make_agent("Evelyn")
+
+    ctx = TickContext(
+        tick=tick,
+        agents=[agent1, agent2, agent3],
+        locations=[loc_a, loc_b],
+        location_by_slug={"harbour_cafe": loc_a, "pub": loc_b},
+        world_state=[],
+        resolved_locations={
+            agent1.id: loc_a,
+            agent2.id: loc_a,
+            agent3.id: loc_b,
+        },
+    )
+
+    groups = ctx.co_located_agents
+    assert len(groups["harbour_cafe"]) == 2
+    assert len(groups["pub"]) == 1
+
+
+@pytest.mark.django_db
+def test_tick_context_co_located_excludes_unresolved():
+    loc = make_location()
+    tick = make_tick()
+    agent1 = make_agent("Margaret")
+    agent2 = make_agent("Bernard")
+
+    ctx = TickContext(
+        tick=tick,
+        agents=[agent1, agent2],
+        locations=[loc],
+        location_by_slug={"harbour_cafe": loc},
+        world_state=[],
+        resolved_locations={agent1.id: loc},  # agent2 has no resolved location
+    )
+
+    groups = ctx.co_located_agents
+    assert agent1 in groups["harbour_cafe"]
+    assert agent2 not in groups.get("harbour_cafe", [])
+
+
+# --- location prompt tests ---
+
+
+@pytest.mark.django_db
+def test_location_prompt_contains_agent_bio():
     agent = make_agent()
     tick = make_tick()
     location = make_location()
-    prompt = build_agent_prompt(agent, tick, [], [], [location])
+    prompt = build_location_prompt(agent, tick, [], [], [location])
     assert agent.bio in prompt
 
 
 @pytest.mark.django_db
-def test_prompt_contains_previous_ticks():
+def test_location_prompt_contains_previous_ticks():
     agent = make_agent()
     location = make_location()
     earlier_tick = make_tick(tz.now() - timedelta(hours=1))
@@ -161,50 +225,163 @@ def test_prompt_contains_previous_ticks():
         agent, earlier_tick, location=location, activity="Buying bread"
     )
     current_tick = make_tick()
-    prompt = build_agent_prompt(agent, current_tick, [at], [], [location])
+    prompt = build_location_prompt(agent, current_tick, [at], [], [location])
     assert "Buying bread" in prompt
 
 
 @pytest.mark.django_db
-def test_prompt_empty_history_when_no_prior_ticks():
+def test_location_prompt_empty_history_when_no_prior_ticks():
     agent = make_agent()
     tick = make_tick()
     location = make_location()
-    prompt = build_agent_prompt(agent, tick, [], [], [location])
+    prompt = build_location_prompt(agent, tick, [], [], [location])
     assert "start of your day" in prompt
 
 
 @pytest.mark.django_db
-def test_prompt_contains_valid_locations():
+def test_location_prompt_contains_valid_locations():
     agent = make_agent()
     tick = make_tick()
     loc1 = make_location(slug="harbour_cafe", name="Harbour Café")
     loc2 = make_location(slug="pub", name="The Pub")
-    prompt = build_agent_prompt(agent, tick, [], [], [loc1, loc2])
+    prompt = build_location_prompt(agent, tick, [], [], [loc1, loc2])
     assert "harbour_cafe" in prompt
     assert "pub" in prompt
 
 
 @pytest.mark.django_db
-def test_prompt_contains_location_descriptions():
+def test_location_prompt_contains_location_descriptions():
     agent = make_agent()
     tick = make_tick()
     location = make_location(slug="harbour_cafe", name="Harbour Café")
-    prompt = build_agent_prompt(agent, tick, [], [], [location])
+    prompt = build_location_prompt(agent, tick, [], [], [location])
     assert "A cosy café overlooking the harbour." in prompt
 
 
 @pytest.mark.django_db
-def test_prompt_contains_world_state():
+def test_location_prompt_contains_world_state():
     agent = make_agent()
     tick = make_tick()
     location = make_location()
     world_state = [
         {"name": "Bernard", "location": "harbour_cafe", "activity": "Fishing"}
     ]
-    prompt = build_agent_prompt(agent, tick, [], world_state, [location])
+    prompt = build_location_prompt(agent, tick, [], world_state, [location])
     assert "Bernard" in prompt
     assert "Fishing" in prompt
+
+
+@pytest.mark.django_db
+def test_location_prompt_asks_for_location_and_intention():
+    agent = make_agent()
+    tick = make_tick()
+    location = make_location()
+    prompt = build_location_prompt(agent, tick, [], [], [location])
+    assert '"location"' in prompt
+    assert '"intention"' in prompt
+
+
+@pytest.mark.django_db
+def test_location_prompt_includes_existing_plan():
+    agent = make_agent()
+    tick = make_tick()
+    location = make_location()
+    plan = ["Buy fish from the harbour", "Visit Margaret"]
+    prompt = build_location_prompt(agent, tick, [], [], [location], daily_plan=plan)
+    assert "Buy fish from the harbour" in prompt
+    assert "Visit Margaret" in prompt
+    assert "Your Plan for Today" in prompt
+
+
+@pytest.mark.django_db
+def test_location_prompt_needs_plan_adds_daily_plan_field():
+    agent = make_agent()
+    tick = make_tick()
+    location = make_location()
+    prompt = build_location_prompt(agent, tick, [], [], [location], needs_plan=True)
+    assert "daily_plan" in prompt
+
+
+@pytest.mark.django_db
+def test_location_prompt_no_plan_section_when_plan_is_none():
+    agent = make_agent()
+    tick = make_tick()
+    location = make_location()
+    prompt = build_location_prompt(agent, tick, [], [], [location])
+    assert "Your Plan for Today" not in prompt
+
+
+# --- activity prompt tests ---
+
+
+@pytest.mark.django_db
+def test_activity_prompt_contains_agent_bio():
+    agent = make_agent()
+    tick = make_tick()
+    location = make_location()
+    prompt = build_activity_prompt(agent, tick, [], location, "Having coffee", [])
+    assert agent.bio in prompt
+
+
+@pytest.mark.django_db
+def test_activity_prompt_contains_resolved_location():
+    agent = make_agent()
+    tick = make_tick()
+    location = make_location(slug="harbour_cafe", name="Harbour Café")
+    prompt = build_activity_prompt(agent, tick, [], location, "", [])
+    assert "Harbour Café" in prompt
+    assert "A cosy café overlooking the harbour." in prompt
+
+
+@pytest.mark.django_db
+def test_activity_prompt_contains_intention():
+    agent = make_agent()
+    tick = make_tick()
+    location = make_location()
+    prompt = build_activity_prompt(
+        agent, tick, [], location, "Catching up on the news", []
+    )
+    assert "Catching up on the news" in prompt
+
+
+@pytest.mark.django_db
+def test_activity_prompt_contains_co_located_agents():
+    agent = make_agent("Margaret")
+    tick = make_tick()
+    location = make_location()
+    co_located = [("Bernard", "A gruff retired fisherman.")]
+    prompt = build_activity_prompt(agent, tick, [], location, "", co_located)
+    assert "Bernard" in prompt
+    assert "A gruff retired fisherman." in prompt
+
+
+@pytest.mark.django_db
+def test_activity_prompt_alone_when_no_co_located():
+    agent = make_agent()
+    tick = make_tick()
+    location = make_location()
+    prompt = build_activity_prompt(agent, tick, [], location, "", [])
+    assert "alone" in prompt.lower()
+
+
+@pytest.mark.django_db
+def test_activity_prompt_asks_for_activity_mood_thought():
+    agent = make_agent()
+    tick = make_tick()
+    location = make_location()
+    prompt = build_activity_prompt(agent, tick, [], location, "", [])
+    assert '"activity"' in prompt
+    assert '"inner_thought"' in prompt
+    assert '"mood"' in prompt
+
+
+@pytest.mark.django_db
+def test_activity_prompt_does_not_contain_valid_locations_list():
+    agent = make_agent()
+    tick = make_tick()
+    location = make_location()
+    prompt = build_activity_prompt(agent, tick, [], location, "", [])
+    assert "Valid Locations" not in prompt
 
 
 # --- LLM client tests ---
@@ -264,7 +441,7 @@ def test_call_llm_raises_on_missing_api_key(mock_settings):
 
 
 @pytest.mark.django_db
-@patch("simulation.runner.call_llm", return_value=VALID_LLM_RESPONSE)
+@patch("simulation.pipeline.call_llm", side_effect=two_phase_responses(1))
 def test_run_tick_creates_tick_record(_mock):
     make_location()
     tick = run_tick()
@@ -273,7 +450,7 @@ def test_run_tick_creates_tick_record(_mock):
 
 
 @pytest.mark.django_db
-@patch("simulation.runner.call_llm", return_value=VALID_LLM_RESPONSE)
+@patch("simulation.pipeline.call_llm", side_effect=two_phase_responses(2))
 def test_run_tick_creates_agent_ticks(_mock):
     make_location()
     make_agent("Margaret")
@@ -283,7 +460,7 @@ def test_run_tick_creates_agent_ticks(_mock):
 
 
 @pytest.mark.django_db
-@patch("simulation.runner.call_llm", return_value=VALID_LLM_RESPONSE)
+@patch("simulation.pipeline.call_llm", side_effect=two_phase_responses(1))
 def test_run_tick_skips_inactive_agents(_mock):
     make_location()
     make_agent("Margaret", active=True)
@@ -293,7 +470,7 @@ def test_run_tick_skips_inactive_agents(_mock):
 
 
 @pytest.mark.django_db
-@patch("simulation.runner.call_llm", return_value=VALID_LLM_RESPONSE)
+@patch("simulation.pipeline.call_llm", side_effect=two_phase_responses(1))
 def test_run_tick_advances_in_game_time(_mock, settings):
     make_location()
     base_time = tz.now()
@@ -304,7 +481,7 @@ def test_run_tick_advances_in_game_time(_mock, settings):
 
 
 @pytest.mark.django_db
-@patch("simulation.runner.call_llm", return_value=VALID_LLM_RESPONSE)
+@patch("simulation.pipeline.call_llm", side_effect=two_phase_responses(1))
 def test_run_tick_uses_now_when_no_prior_tick(_mock):
     make_location()
     before = tz.now()
@@ -315,13 +492,19 @@ def test_run_tick_uses_now_when_no_prior_tick(_mock):
 
 @pytest.mark.django_db
 @patch(
-    "simulation.runner.call_llm",
-    return_value=json.dumps({
-        "location": "nonexistent_slug",
-        "activity": "Wandering",
-        "inner_thought": "Lost.",
-        "mood": "confused",
-    }),
+    "simulation.pipeline.call_llm",
+    side_effect=two_phase_responses(
+        1,
+        phase1=json.dumps({
+            "location": "nonexistent_slug",
+            "intention": "Wandering around.",
+        }),
+        phase2=json.dumps({
+            "activity": "Wandering",
+            "inner_thought": "Lost.",
+            "mood": "confused",
+        }),
+    ),
 )
 def test_run_tick_handles_invalid_location_slug(_mock):
     make_location()
@@ -338,16 +521,14 @@ def test_run_tick_handles_llm_error():
     make_agent("Good")
     make_agent("Bad")
 
-    call_count = 0
-
-    def side_effect(prompt):
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            raise LLMError("OpenRouter HTTP 500: Internal Server Error")
-        return VALID_LLM_RESPONSE
-
-    with patch("simulation.runner.call_llm", side_effect=side_effect):
+    with patch(
+        "simulation.pipeline.call_llm",
+        side_effect=[
+            LLMError("OpenRouter HTTP 500: Internal Server Error"),  # phase 1 Good
+            VALID_LLM_RESPONSE,  # phase 1 Bad
+            VALID_LLM_RESPONSE,  # phase 2 Bad
+        ],
+    ):
         tick = run_tick()
 
     assert AgentTick.objects.filter(tick=tick).count() == 1
@@ -359,16 +540,14 @@ def test_run_tick_activates_tick_even_with_partial_failure():
     make_agent("Good")
     make_agent("Bad")
 
-    call_count = 0
-
-    def side_effect(prompt):
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            raise LLMError("OpenRouter HTTP 500: Internal Server Error")
-        return VALID_LLM_RESPONSE
-
-    with patch("simulation.runner.call_llm", side_effect=side_effect):
+    with patch(
+        "simulation.pipeline.call_llm",
+        side_effect=[
+            LLMError("OpenRouter HTTP 500: Internal Server Error"),  # phase 1 Good
+            VALID_LLM_RESPONSE,  # phase 1 Bad
+            VALID_LLM_RESPONSE,  # phase 2 Bad
+        ],
+    ):
         tick = run_tick()
 
     assert tick.active is True
@@ -376,7 +555,10 @@ def test_run_tick_activates_tick_even_with_partial_failure():
 
 
 @pytest.mark.django_db
-@patch("simulation.runner.call_llm", return_value=FENCED_LLM_RESPONSE)
+@patch(
+    "simulation.pipeline.call_llm",
+    side_effect=[FENCED_LLM_RESPONSE, FENCED_LLM_RESPONSE],
+)
 def test_run_tick_handles_markdown_fenced_response(_mock):
     make_location()
     make_agent()
@@ -387,21 +569,24 @@ def test_run_tick_handles_markdown_fenced_response(_mock):
 
 
 @pytest.mark.django_db
-@patch("simulation.runner.call_llm", return_value=VALID_LLM_RESPONSE)
-def test_run_tick_stores_raw_prompt_and_response(_mock):
+@patch("simulation.pipeline.call_llm", side_effect=two_phase_responses(1))
+def test_run_tick_stores_raw_prompts_and_responses(_mock):
     make_location()
     make_agent()
     tick = run_tick()
     at = AgentTick.objects.get(tick=tick)
-    assert len(at.raw_prompt) > 0
-    assert at.raw_response == VALID_LLM_RESPONSE
+    assert "LocationResolutionStep" in at.raw_prompts
+    assert "ActivityGenerationStep" in at.raw_prompts
+    assert len(at.raw_prompts["LocationResolutionStep"]) > 0
+    assert len(at.raw_prompts["ActivityGenerationStep"]) > 0
+    assert at.raw_responses["ActivityGenerationStep"] == VALID_LLM_RESPONSE
 
 
 # --- daily plan tests ---
 
 
 @pytest.mark.django_db
-@patch("simulation.runner.call_llm", return_value=VALID_LLM_RESPONSE_WITH_PLAN)
+@patch("simulation.pipeline.call_llm", return_value=VALID_LLM_RESPONSE_WITH_PLAN)
 def test_plan_generated_on_first_morning_tick(_mock, settings):
     settings.PLAN_HOUR = 6
     make_location()
@@ -420,12 +605,11 @@ def test_plan_generated_on_first_morning_tick(_mock, settings):
 
 
 @pytest.mark.django_db
-@patch("simulation.runner.call_llm", return_value=VALID_LLM_RESPONSE_WITH_PLAN)
+@patch("simulation.pipeline.call_llm", return_value=VALID_LLM_RESPONSE_WITH_PLAN)
 def test_plan_not_generated_before_plan_hour(_mock, settings):
     settings.PLAN_HOUR = 6
     make_location()
     make_agent()
-    # Tick at 05:30 — before PLAN_HOUR
     early_time = tz.now().replace(hour=5, minute=15, second=0, microsecond=0)
     Tick.objects.create(in_game_time=early_time)
     run_tick()
@@ -433,7 +617,7 @@ def test_plan_not_generated_before_plan_hour(_mock, settings):
 
 
 @pytest.mark.django_db
-@patch("simulation.runner.call_llm", return_value=VALID_LLM_RESPONSE_WITH_PLAN)
+@patch("simulation.pipeline.call_llm", return_value=VALID_LLM_RESPONSE_WITH_PLAN)
 def test_plan_not_regenerated_when_one_exists(_mock, settings):
     settings.PLAN_HOUR = 6
     make_location()
@@ -452,43 +636,14 @@ def test_plan_not_regenerated_when_one_exists(_mock, settings):
 
 
 @pytest.mark.django_db
-def test_existing_plan_injected_into_prompt():
-    agent = make_agent()
-    tick = make_tick()
-    location = make_location()
-    plan = ["Buy fish from the harbour", "Visit Margaret"]
-    prompt = build_agent_prompt(agent, tick, [], [], [location], daily_plan=plan)
-    assert "Buy fish from the harbour" in prompt
-    assert "Visit Margaret" in prompt
-    assert "Your Plan for Today" in prompt
-
-
-@pytest.mark.django_db
-def test_needs_plan_adds_daily_plan_to_instructions():
-    agent = make_agent()
-    tick = make_tick()
-    location = make_location()
-    prompt = build_agent_prompt(agent, tick, [], [], [location], needs_plan=True)
-    assert "daily_plan" in prompt
-
-
-@pytest.mark.django_db
-def test_no_plan_section_when_plan_is_none():
-    agent = make_agent()
-    tick = make_tick()
-    location = make_location()
-    prompt = build_agent_prompt(agent, tick, [], [], [location])
-    assert "Your Plan for Today" not in prompt
-
-
-@pytest.mark.django_db
-@patch("simulation.runner.call_llm")
+@patch("simulation.pipeline.call_llm")
 def test_plan_gracefully_skipped_on_invalid_llm_output(mock_llm, settings):
     settings.PLAN_HOUR = 6
     make_location()
     make_agent()
     mock_llm.return_value = json.dumps({
         "location": "harbour_cafe",
+        "intention": "Having coffee",
         "activity": "Wandering",
         "inner_thought": "Hmm.",
         "mood": "confused",

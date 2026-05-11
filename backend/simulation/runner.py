@@ -1,14 +1,17 @@
-import json
 import logging
 from datetime import timedelta
 
 from django.conf import settings
 from django.utils import timezone as tz
 
-from world.models import Agent, AgentTick, DailyPlan, Location, Tick
+from world.models import Agent, AgentTick, Location, Tick
 
-from .llm import call_llm
-from .prompts import build_agent_prompt
+from .pipeline import (
+    ActivityGenerationStep,
+    LocationResolutionStep,
+    PerAgentStep,
+    TickContext,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,24 +33,44 @@ def run_tick() -> Tick:
 
     agents = list(Agent.objects.filter(active=True))
     locations = list(Location.objects.all())
-    location_by_slug = {loc.slug: loc for loc in locations}
 
-    world_state = _build_world_state(previous_tick)
+    ctx = TickContext(
+        tick=tick,
+        agents=agents,
+        locations=locations,
+        location_by_slug={loc.slug: loc for loc in locations},
+        world_state=_build_world_state(previous_tick),
+    )
 
-    processed = 0
-    for agent in agents:
-        try:
-            _process_agent(agent, tick, world_state, locations, location_by_slug)
-            processed += 1
-        except Exception:
-            logger.exception("Failed to process agent %s (id=%d)", agent.name, agent.id)
+    steps: list[PerAgentStep] = [
+        LocationResolutionStep(),
+        ActivityGenerationStep(),
+    ]
+
+    for step in steps:
+        processed = 0
+        for agent in agents:
+            try:
+                step.run(agent, ctx)
+                processed += 1
+            except Exception:
+                logger.exception(
+                    "[%s] Failed for agent %s (id=%d)",
+                    type(step).__name__,
+                    agent.name,
+                    agent.id,
+                )
+        logger.info(
+            "[%s] %d/%d agents processed",
+            type(step).__name__,
+            processed,
+            len(agents),
+        )
 
     tick.active = True
     tick.save(update_fields=["active"])
 
-    logger.info(
-        "Tick %d complete — %d/%d agents processed", tick.id, processed, len(agents)
-    )
+    logger.info("Tick %d complete", tick.id)
     return tick
 
 
@@ -66,110 +89,3 @@ def _build_world_state(previous_tick: Tick | None) -> list[dict]:
         }
         for at in agent_ticks
     ]
-
-
-def _normalise(data: dict) -> dict:
-    """Normalise LLM output fields before persisting."""
-    activity = data.get("activity", "").strip()
-    inner_thought = data.get("inner_thought", "").strip()
-    mood = data.get("mood", "").strip().lower()
-    return {
-        # [:1].upper() rather than capitalize() to avoid lowercasing the rest (e.g. "BBC", "I")
-        "activity": activity[:1].upper() + activity[1:] if activity else "",
-        "inner_thought": inner_thought[:1].upper() + inner_thought[1:]
-        if inner_thought
-        else "",
-        "mood": mood,
-    }
-
-
-def _extract_json(text: str) -> str:
-    """Strip markdown fences or other wrapping and return the bare JSON object."""
-    start = text.find("{")
-    end = text.rfind("}")
-    if start == -1 or end == -1:
-        return text
-    return text[start : end + 1]
-
-
-def _process_agent(
-    agent: Agent,
-    tick: Tick,
-    world_state: list[dict],
-    locations: list[Location],
-    location_by_slug: dict[str, Location],
-) -> None:
-    day_start = tick.in_game_time.replace(hour=0, minute=0, second=0, microsecond=0)
-    previous_agent_ticks = list(
-        AgentTick.objects
-        .filter(
-            agent=agent,
-            tick__in_game_time__gte=day_start,
-            tick__in_game_time__lt=tick.in_game_time,
-        )
-        .select_related("tick", "location")
-        .order_by("tick__in_game_time")
-    )
-
-    today = tick.in_game_time.date()
-    existing_plan = DailyPlan.objects.filter(agent=agent, date=today).first()
-    needs_plan = existing_plan is None and tick.in_game_time.hour >= settings.PLAN_HOUR
-    daily_plan = existing_plan.plan if existing_plan else None
-
-    prompt = build_agent_prompt(
-        agent,
-        tick,
-        previous_agent_ticks,
-        world_state,
-        locations,
-        daily_plan=daily_plan,
-        needs_plan=needs_plan,
-    )
-
-    raw_response = call_llm(prompt)
-
-    try:
-        data = json.loads(_extract_json(raw_response))
-    except json.JSONDecodeError as exc:
-        logger.error(
-            "Agent %s returned invalid JSON: %s — raw: %.200s",
-            agent.name,
-            exc,
-            raw_response,
-        )
-        raise
-
-    if needs_plan:
-        plan_items = data.get("daily_plan")
-        if isinstance(plan_items, list) and plan_items:
-            DailyPlan.objects.create(
-                agent=agent,
-                date=today,
-                plan=[str(item) for item in plan_items],
-                generated_at_tick=tick,
-            )
-            logger.info("Created daily plan for %s on %s", agent.name, today)
-        else:
-            logger.warning(
-                "Agent %s did not return a valid daily_plan — got %r",
-                agent.name,
-                plan_items,
-            )
-
-    slug = data.get("location", "").strip().lower()
-    location = location_by_slug.get(slug)
-    if slug and not location:
-        logger.warning("Agent %s returned unknown location slug %r", agent.name, slug)
-
-    normalised = _normalise(data)
-
-    AgentTick.objects.create(
-        agent=agent,
-        tick=tick,
-        location=location,
-        activity=normalised["activity"],
-        inner_thought=normalised["inner_thought"],
-        mood=normalised["mood"],
-        raw_prompt=prompt,
-        raw_response=raw_response,
-    )
