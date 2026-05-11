@@ -5,7 +5,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone as tz
 
-from world.models import Agent, AgentTick, Location, Tick
+from world.models import Agent, AgentTick, DailyPlan, Location, Tick
 
 from .llm import call_llm
 from .prompts import build_agent_prompt
@@ -111,8 +111,19 @@ def _process_agent(
         .order_by("tick__in_game_time")
     )
 
+    today = tick.in_game_time.date()
+    existing_plan = DailyPlan.objects.filter(agent=agent, date=today).first()
+    needs_plan = existing_plan is None and tick.in_game_time.hour >= settings.PLAN_HOUR
+    daily_plan = existing_plan.plan if existing_plan else None
+
     prompt = build_agent_prompt(
-        agent, tick, previous_agent_ticks, world_state, locations
+        agent,
+        tick,
+        previous_agent_ticks,
+        world_state,
+        locations,
+        daily_plan=daily_plan,
+        needs_plan=needs_plan,
     )
 
     raw_response = call_llm(prompt)
@@ -127,6 +138,23 @@ def _process_agent(
             raw_response,
         )
         raise
+
+    if needs_plan:
+        plan_items = data.get("daily_plan")
+        if isinstance(plan_items, list) and plan_items:
+            DailyPlan.objects.create(
+                agent=agent,
+                date=today,
+                plan=[str(item) for item in plan_items],
+                generated_at_tick=tick,
+            )
+            logger.info("Created daily plan for %s on %s", agent.name, today)
+        else:
+            logger.warning(
+                "Agent %s did not return a valid daily_plan — got %r",
+                agent.name,
+                plan_items,
+            )
 
     slug = data.get("location", "").strip().lower()
     location = location_by_slug.get(slug)
