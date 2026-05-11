@@ -27,6 +27,7 @@ class Location(models.Model):
 class Tick(models.Model):
     in_game_time = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
+    active = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["-in_game_time"]

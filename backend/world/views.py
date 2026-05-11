@@ -38,7 +38,7 @@ def tick_detail(request, pk):
 
 @api_view(["GET"])
 def tick_latest(request):
-    latest = Tick.objects.only("id").first()
+    latest = Tick.objects.filter(active=True).only("id").first()
     if latest is None:
         return Response(status=status.HTTP_404_NOT_FOUND)
 

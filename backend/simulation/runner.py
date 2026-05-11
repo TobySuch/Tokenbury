@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 def run_tick() -> Tick:
+    # Intentionally no active filter — even a partially-processed tick represents
+    # a point in time and partial world state that is useful context for the next run.
     previous_tick = Tick.objects.order_by("-in_game_time").first()
 
     if previous_tick is None:
@@ -39,6 +41,9 @@ def run_tick() -> Tick:
             processed += 1
         except Exception:
             logger.exception("Failed to process agent %s (id=%d)", agent.name, agent.id)
+
+    tick.active = True
+    tick.save(update_fields=["active"])
 
     logger.info(
         "Tick %d complete — %d/%d agents processed", tick.id, processed, len(agents)
