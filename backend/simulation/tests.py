@@ -10,7 +10,7 @@ from world.models import Agent, AgentTick, DailyPlan, Location, Tick
 from simulation.llm import LLMError, call_llm
 from simulation.pipeline import TickContext, _extract_json, _normalise
 from simulation.prompts import build_activity_prompt, build_location_prompt
-from simulation.runner import run_tick
+from simulation.runner import _round_to_interval, run_tick
 
 
 # --- factories ---
@@ -482,12 +482,12 @@ def test_run_tick_advances_in_game_time(_mock, settings):
 
 @pytest.mark.django_db
 @patch("simulation.pipeline.call_llm", side_effect=two_phase_responses(1))
-def test_run_tick_uses_now_when_no_prior_tick(_mock):
+def test_run_tick_uses_now_when_no_prior_tick(_mock, settings):
     make_location()
-    before = tz.now()
     tick = run_tick()
-    after = tz.now()
-    assert before <= tick.in_game_time <= after
+    assert tick.in_game_time.second == 0
+    assert tick.in_game_time.microsecond == 0
+    assert tick.in_game_time.minute % settings.TICK_INTERVAL_MINUTES == 0
 
 
 @pytest.mark.django_db
@@ -653,3 +653,72 @@ def test_plan_gracefully_skipped_on_invalid_llm_output(mock_llm, settings):
     Tick.objects.create(in_game_time=morning_time)
     run_tick()
     assert DailyPlan.objects.count() == 0
+
+
+# --- _round_to_interval tests ---
+
+
+def test_round_to_interval_rounds_down():
+    dt = tz.now().replace(hour=10, minute=7, second=30, microsecond=0)
+    result = _round_to_interval(dt, 15)
+    assert result.hour == 10
+    assert result.minute == 0
+    assert result.second == 0
+
+
+def test_round_to_interval_rounds_up():
+    dt = tz.now().replace(hour=10, minute=8, second=0, microsecond=0)
+    result = _round_to_interval(dt, 15)
+    assert result.hour == 10
+    assert result.minute == 15
+    assert result.second == 0
+
+
+def test_round_to_interval_on_exact_boundary():
+    dt = tz.now().replace(hour=10, minute=15, second=0, microsecond=0)
+    result = _round_to_interval(dt, 15)
+    assert result.hour == 10
+    assert result.minute == 15
+
+
+def test_round_to_interval_clears_subseconds():
+    dt = tz.now().replace(hour=10, minute=0, second=45, microsecond=123456)
+    result = _round_to_interval(dt, 15)
+    assert result.second == 0
+    assert result.microsecond == 0
+
+
+# --- catchup tests ---
+
+
+@pytest.mark.django_db
+@patch("simulation.pipeline.call_llm", side_effect=two_phase_responses(1))
+def test_run_tick_catchup_jumps_to_rounded_now(_mock, settings):
+    make_location()
+    old_time = tz.now() - timedelta(hours=5)
+    Tick.objects.create(in_game_time=old_time, active=True)
+    tick = run_tick(catchup=True)
+    half_interval = timedelta(minutes=settings.TICK_INTERVAL_MINUTES / 2)
+    assert abs(tick.in_game_time - tz.now()) <= half_interval
+
+
+@pytest.mark.django_db
+@patch("simulation.pipeline.call_llm", side_effect=two_phase_responses(1))
+def test_run_tick_catchup_falls_back_when_already_caught_up(_mock, settings):
+    make_location()
+    future_time = tz.now() + timedelta(hours=1)
+    Tick.objects.create(in_game_time=future_time, active=True)
+    tick = run_tick(catchup=True)
+    expected = future_time + timedelta(minutes=settings.TICK_INTERVAL_MINUTES)
+    assert tick.in_game_time == expected
+
+
+@pytest.mark.django_db
+@patch("simulation.pipeline.call_llm", side_effect=two_phase_responses(1))
+def test_run_tick_catchup_falls_back_when_rounded_equals_last_tick(_mock, settings):
+    make_location()
+    rounded_now = _round_to_interval(tz.now(), settings.TICK_INTERVAL_MINUTES)
+    Tick.objects.create(in_game_time=rounded_now, active=True)
+    tick = run_tick(catchup=True)
+    expected = rounded_now + timedelta(minutes=settings.TICK_INTERVAL_MINUTES)
+    assert tick.in_game_time == expected

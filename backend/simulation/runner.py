@@ -1,5 +1,5 @@
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.utils import timezone as tz
@@ -16,17 +16,30 @@ from .pipeline import (
 logger = logging.getLogger(__name__)
 
 
-def run_tick() -> Tick:
+def _round_to_interval(dt: datetime, interval_minutes: int) -> datetime:
+    total_seconds = interval_minutes * 60
+    epoch = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    delta = (dt - epoch).total_seconds()
+    rounded = round(delta / total_seconds) * total_seconds
+    return epoch + timedelta(seconds=rounded)
+
+
+def run_tick(catchup: bool = False) -> Tick:
+    interval = settings.TICK_INTERVAL_MINUTES
     # Intentionally no active filter — even a partially-processed tick represents
     # a point in time and partial world state that is useful context for the next run.
     previous_tick = Tick.objects.order_by("-in_game_time").first()
 
     if previous_tick is None:
-        in_game_time = tz.now()
+        in_game_time = _round_to_interval(tz.now(), interval)
+    elif catchup:
+        rounded = _round_to_interval(tz.now(), interval)
+        if rounded > previous_tick.in_game_time:
+            in_game_time = rounded
+        else:
+            in_game_time = previous_tick.in_game_time + timedelta(minutes=interval)
     else:
-        in_game_time = previous_tick.in_game_time + timedelta(
-            minutes=settings.TICK_INTERVAL_MINUTES
-        )
+        in_game_time = previous_tick.in_game_time + timedelta(minutes=interval)
 
     tick = Tick.objects.create(in_game_time=in_game_time)
     logger.info("Created tick %d at %s", tick.id, in_game_time)

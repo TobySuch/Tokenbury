@@ -7,8 +7,18 @@ from world.models import AgentTick
 class Command(BaseCommand):
     help = "Run one simulation tick, generating AgentTick records via LLM"
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--catchup",
+            action="store_true",
+            help="Set in_game_time to current real-world time (rounded to the nearest interval) instead of advancing sequentially. Use to recover after downtime.",
+        )
+
     def handle(self, *args, **options):
-        tick = run_tick()
+        catchup = options["catchup"]
+        if catchup:
+            self.stdout.write("Catchup mode: jumping to current real-world time.")
+        tick = run_tick(catchup=catchup)
         count = AgentTick.objects.filter(tick=tick).count()
         self.stdout.write(
             self.style.SUCCESS(
