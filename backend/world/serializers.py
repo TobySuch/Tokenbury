@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from world.models import AgentTick, Location, Tick
+from world.models import Agent, AgentTick, DailyPlan, Location, Tick
 
 
 class LocationSerializer(serializers.ModelSerializer):
@@ -41,6 +41,28 @@ class AgentTickSerializer(serializers.ModelSerializer):
             "mood",
             "inner_thought",
         ]
+
+
+class AgentDetailSerializer(serializers.ModelSerializer):
+    sprite_url = serializers.SerializerMethodField()
+    todays_plan = serializers.SerializerMethodField()
+
+    def get_sprite_url(self, obj):
+        if obj.sprite:
+            return obj.sprite.url
+        return None
+
+    def get_todays_plan(self, obj):
+        latest_tick = Tick.objects.filter(active=True).only("in_game_time").first()
+        if not latest_tick:
+            return None
+        today = latest_tick.in_game_time.date()
+        plan = DailyPlan.objects.filter(agent=obj, date=today).first()
+        return plan.plan if plan else None
+
+    class Meta:
+        model = Agent
+        fields = ["id", "name", "bio", "sprite_url", "todays_plan"]
 
 
 class TickListSerializer(serializers.ModelSerializer):

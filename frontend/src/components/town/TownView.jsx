@@ -80,8 +80,8 @@ export default function TownView({ onAgentChange }) {
           (s) => s.agent_id === lockedAgentRef.current.agent_id
         )
         if (updated) {
-          const locName = locs.find((l) => l.slug === updated.location_slug)?.name
-          const enriched = { ...updated, location_name: locName }
+          const loc = locs.find((l) => l.slug === updated.location_slug)
+          const enriched = enrichAgent(updated, loc ?? { name: null, description: null })
           setLockedAgent(enriched)
           lockedAgentRef.current = enriched
           onAgentChange?.(enriched)
@@ -111,6 +111,14 @@ export default function TownView({ onAgentChange }) {
     }, 30_000)
     return () => clearInterval(id)
   }, [applyTick])
+
+  function enrichAgent(agent, loc) {
+    return {
+      ...agent,
+      location_name: loc.name,
+      location_description: loc.description,
+    }
+  }
 
   function handleSpriteHover(agent) {
     setHoveredAgent(agent)
@@ -209,9 +217,9 @@ export default function TownView({ onAgentChange }) {
                     name={a.agent_name}
                     spriteUrl={a.agent_sprite_url}
                     isActive={a.agent_id === (hoveredAgent?.agent_id ?? lockedAgent?.agent_id)}
-                    onHover={() => handleSpriteHover({ ...a, location_name: loc.name })}
+                    onHover={() => handleSpriteHover(enrichAgent(a, loc))}
                     onHoverEnd={handleSpriteHoverEnd}
-                    onClick={() => handleSpriteClick({ ...a, location_name: loc.name })}
+                    onClick={() => handleSpriteClick(enrichAgent(a, loc))}
                   />
                 ))}
               </div>
