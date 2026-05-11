@@ -186,6 +186,15 @@ def test_prompt_contains_valid_locations():
 
 
 @pytest.mark.django_db
+def test_prompt_contains_location_descriptions():
+    agent = make_agent()
+    tick = make_tick()
+    location = make_location(slug="harbour_cafe", name="Harbour Café")
+    prompt = build_agent_prompt(agent, tick, [], [], [location])
+    assert "A cosy café overlooking the harbour." in prompt
+
+
+@pytest.mark.django_db
 def test_prompt_contains_world_state():
     agent = make_agent()
     tick = make_tick()
