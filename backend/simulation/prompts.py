@@ -16,6 +16,9 @@ def build_agent_prompt(
     needs_plan: bool = False,
 ) -> str:
     location_slugs = ", ".join(loc.slug for loc in locations)
+    location_lines = "\n".join(
+        f"  - {loc.slug} ({loc.name}): {loc.description}" for loc in locations
+    )
 
     if daily_plan is not None:
         plan_lines = "\n".join(f"  - {item}" for item in daily_plan)
@@ -68,11 +71,11 @@ Bio: {agent.bio}
 {world_section}
 
 ## Valid Locations
-{location_slugs}
+{location_lines}
 
 Based on your character and the current situation, decide what you do next. \
 Respond with only a JSON object with these fields:
-- "location": one of the valid location slugs above
+- "location": one of the valid location slugs above (e.g. {location_slugs})
 - "activity": a short description of what you are doing (one sentence)
 - "inner_thought": your private inner thought in first person
 - "mood": one word describing your current mood{plan_field}"""
