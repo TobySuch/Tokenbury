@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { fetchLocations, fetchLatestTick } from '../../api/client'
 import AgentSprite from '../agents/AgentSprite'
+import TickClock from './TickClock'
 
 const FILL_COLOURS = [
   'rgba(239,68,68,0.35)',
@@ -56,6 +57,7 @@ export default function TownView({ onAgentChange }) {
   const [hoverCoords, setHoverCoords] = useState(null)
   const [hoveredAgent, setHoveredAgent] = useState(null)
   const [lockedAgent, setLockedAgent] = useState(null)
+  const [currentInGameTime, setCurrentInGameTime] = useState(null)
   const lockedAgentRef = useRef(null)
   const imgRef = useRef(null)
   const currentTickIdRef = useRef(null)
@@ -65,6 +67,7 @@ export default function TownView({ onAgentChange }) {
     function applyTick(tick, locs) {
       if (!tick?.agent_states) return
       currentTickIdRef.current = tick.id
+      setCurrentInGameTime(tick.in_game_time)
       const byLoc = new Map()
       for (const state of tick.agent_states) {
         if (!state.location_slug) continue
@@ -148,6 +151,7 @@ export default function TownView({ onAgentChange }) {
       onMouseMove={isDebug ? handleMouseMove : undefined}
       onMouseLeave={isDebug ? handleMouseLeave : undefined}
     >
+      <TickClock inGameTime={currentInGameTime} />
       <img
         ref={imgRef}
         src="/assets/map/town.png"
