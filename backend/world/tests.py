@@ -234,3 +234,55 @@ def test_tick_latest_skips_inactive_tick(client):
     make_tick(active=False)
     response = client.get("/api/ticks/latest/")
     assert response.status_code == 404
+
+
+# --- /api/agents/<pk>/ ---
+
+
+@pytest.mark.django_db
+def test_agent_detail_not_found(client):
+    response = client.get("/api/agents/999/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_agent_detail_returns_bio(client):
+    agent = make_agent("Margaret")
+    response = client.get(f"/api/agents/{agent.pk}/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == agent.pk
+    assert data["name"] == "Margaret"
+    assert data["bio"] == "A retired teacher."
+    assert data["todays_plan"] is None
+
+
+@pytest.mark.django_db
+def test_agent_detail_returns_todays_plan(client):
+    agent = make_agent()
+    tick = make_tick(in_game_time="2024-01-01T09:00:00Z", active=True)
+    DailyPlan.objects.create(
+        agent=agent,
+        date="2024-01-01",
+        plan=["Morning walk", "Coffee at café"],
+        generated_at_tick=tick,
+    )
+    response = client.get(f"/api/agents/{agent.pk}/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["todays_plan"] == ["Morning walk", "Coffee at café"]
+
+
+@pytest.mark.django_db
+def test_agent_detail_no_plan_for_today_returns_none(client):
+    agent = make_agent()
+    tick = make_tick(in_game_time="2024-01-02T09:00:00Z", active=True)
+    DailyPlan.objects.create(
+        agent=agent,
+        date="2024-01-01",
+        plan=["Yesterday's plan"],
+        generated_at_tick=tick,
+    )
+    response = client.get(f"/api/agents/{agent.pk}/")
+    assert response.status_code == 200
+    assert response.json()["todays_plan"] is None

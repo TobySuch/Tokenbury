@@ -2,8 +2,9 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
-from world.models import Location, Tick
+from world.models import Agent, Location, Tick
 from world.serializers import (
+    AgentDetailSerializer,
     LocationSerializer,
     TickDetailSerializer,
     TickListSerializer,
@@ -13,6 +14,15 @@ from world.serializers import (
 @api_view(["GET"])
 def health(request):
     return Response({"status": "ok", "message": "Tokenbury is alive 🌊"})
+
+
+@api_view(["GET"])
+def agent_detail(request, pk):
+    try:
+        agent = Agent.objects.get(pk=pk)
+    except Agent.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    return Response(AgentDetailSerializer(agent).data)
 
 
 @api_view(["GET"])
