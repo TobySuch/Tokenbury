@@ -87,9 +87,11 @@ afterEach(() => {
   setDebugMode(false)
 })
 
-test('renders the map image', () => {
+test('renders the map image', async () => {
   mockFetch()
-  render(<TownView />)
+  await act(async () => {
+    render(<TownView />)
+  })
   expect(screen.getByRole('img', { name: /tokenbury/i })).toBeInTheDocument()
 })
 
