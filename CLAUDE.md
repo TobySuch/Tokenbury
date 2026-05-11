@@ -162,16 +162,24 @@ Vite proxies all `/api/*` requests to Django, so the frontend never needs to kno
 ## Running Tests
 
 ```bash
-# Frontend (Vitest — must use bun run test, not bun test directly)
-cd frontend && bun run test
+# Run all tests (recommended)
+make test
 
-# Backend (pytest-django — must use uv run pytest, not manage.py test)
+# Individually
+make test  # runs both backend and frontend
+
+# Backend only (pytest-django — must use uv run pytest, not manage.py test)
 cd backend && uv run pytest
+
+# Frontend only (Vitest — must use bun run test, not bun test directly)
+cd frontend && bun run test
 ```
 
 > **Note:** Running `bun test` directly invokes Bun's own test runner, which doesn't honour the Vitest globals config. Always use `bun run test` to go through the `package.json` script.
 
 > **Note:** Backend tests use pytest with `pytest-django` markers (`@pytest.mark.django_db`). Django's own `manage.py test` runner won't discover them — always use `uv run pytest`.
+
+> **Note:** Prefer `make` commands over invoking tools directly where a Makefile target exists (e.g. `make install` not `bun install`, `make migrate` not `manage.py migrate`). Check the Makefile first.
 
 ---
 
