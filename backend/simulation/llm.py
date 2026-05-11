@@ -1,8 +1,15 @@
 import json
+import logging
+import time
 import urllib.error
 import urllib.request
 
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
+
+RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+MAX_RETRIES = 3
 
 
 class LLMError(Exception):
@@ -33,10 +40,23 @@ def call_llm(prompt: str) -> str:
         method="POST",
     )
 
-    try:
-        with urllib.request.urlopen(req) as resp:
-            body = json.loads(resp.read())
-    except urllib.error.HTTPError as exc:
-        raise LLMError(f"OpenRouter HTTP {exc.code}: {exc.reason}") from exc
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            with urllib.request.urlopen(req) as resp:
+                body = json.loads(resp.read())
+            return body["choices"][0]["message"]["content"]
+        except urllib.error.HTTPError as exc:
+            if exc.code not in RETRYABLE_STATUS or attempt == MAX_RETRIES:
+                raise LLMError(f"OpenRouter HTTP {exc.code}: {exc.reason}") from exc
+            retry_after = exc.headers.get("Retry-After")
+            delay = min(int(retry_after), 60) if retry_after else 2**attempt
+            logger.warning(
+                "OpenRouter %d — retrying in %ds (attempt %d/%d)",
+                exc.code,
+                delay,
+                attempt + 1,
+                MAX_RETRIES,
+            )
+            time.sleep(delay)
 
-    return body["choices"][0]["message"]["content"]
+    raise LLMError("Exhausted retries")

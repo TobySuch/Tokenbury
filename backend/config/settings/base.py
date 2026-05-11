@@ -68,3 +68,31 @@ OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 LLM_MODEL = os.environ.get("LLM_MODEL", "anthropic/claude-haiku-4-5")
 TICK_INTERVAL_MINUTES = int(os.environ.get("TICK_INTERVAL_MINUTES", "15"))
 PLAN_HOUR = int(os.environ.get("PLAN_HOUR", "6"))
+
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "simple": {
+            "format": "{asctime} {levelname} {name}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": LOG_LEVEL,
+    },
+    "loggers": {
+        "django": {"level": LOG_LEVEL},
+        "simulation": {"level": LOG_LEVEL},
+        "world": {"level": LOG_LEVEL},
+    },
+}
