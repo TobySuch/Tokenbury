@@ -38,7 +38,7 @@ createsuperuser:
 # ─── Simulation ───────────────────────────────────────────────────────────────
 
 ticker:
-	cd backend && uv run python manage.py run_ticker
+	cd backend && uv run python manage.py run_ticker $(ARGS)
 
 # ─── Code Quality ─────────────────────────────────────────────────────────────
 
