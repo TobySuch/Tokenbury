@@ -36,10 +36,10 @@ def make_location(slug="harbour_cafe", name="Harbour Café"):
     )
 
 
-def make_tick(in_game_time=None):
+def make_tick(in_game_time=None, active=False):
     if in_game_time is None:
         in_game_time = tz.now()
-    return Tick.objects.create(in_game_time=in_game_time)
+    return Tick.objects.create(in_game_time=in_game_time, active=active)
 
 
 def make_agent_tick(
@@ -246,8 +246,9 @@ def test_call_llm_raises_on_missing_api_key(mock_settings):
 @patch("simulation.runner.call_llm", return_value=VALID_LLM_RESPONSE)
 def test_run_tick_creates_tick_record(_mock):
     make_location()
-    run_tick()
+    tick = run_tick()
     assert Tick.objects.count() == 1
+    assert tick.active is True
 
 
 @pytest.mark.django_db
@@ -328,6 +329,28 @@ def test_run_tick_handles_llm_error():
     with patch("simulation.runner.call_llm", side_effect=side_effect):
         tick = run_tick()
 
+    assert AgentTick.objects.filter(tick=tick).count() == 1
+
+
+@pytest.mark.django_db
+def test_run_tick_activates_tick_even_with_partial_failure():
+    make_location()
+    make_agent("Good")
+    make_agent("Bad")
+
+    call_count = 0
+
+    def side_effect(prompt):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise LLMError("OpenRouter HTTP 500: Internal Server Error")
+        return VALID_LLM_RESPONSE
+
+    with patch("simulation.runner.call_llm", side_effect=side_effect):
+        tick = run_tick()
+
+    assert tick.active is True
     assert AgentTick.objects.filter(tick=tick).count() == 1
 
 

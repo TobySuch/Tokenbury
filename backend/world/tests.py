@@ -72,8 +72,8 @@ def make_location():
     )
 
 
-def make_tick(in_game_time="2024-01-01T09:00:00Z"):
-    return Tick.objects.create(in_game_time=in_game_time)
+def make_tick(in_game_time="2024-01-01T09:00:00Z", active=False):
+    return Tick.objects.create(in_game_time=in_game_time, active=active)
 
 
 # --- Tick model ---
@@ -180,8 +180,8 @@ def test_tick_latest_not_found(client):
 
 @pytest.mark.django_db
 def test_tick_latest_returns_most_recent(client):
-    make_tick("2024-01-01T08:00:00Z")
-    latest = make_tick("2024-01-01T10:00:00Z")
+    make_tick("2024-01-01T08:00:00Z", active=True)
+    latest = make_tick("2024-01-01T10:00:00Z", active=True)
     response = client.get("/api/ticks/latest/")
     assert response.status_code == 200
     assert response.json()["id"] == latest.pk
@@ -189,15 +189,15 @@ def test_tick_latest_returns_most_recent(client):
 
 @pytest.mark.django_db
 def test_tick_latest_304_when_id_matches(client):
-    tick = make_tick()
+    tick = make_tick(active=True)
     response = client.get(f"/api/ticks/latest/?last_tick_id={tick.pk}")
     assert response.status_code == 304
 
 
 @pytest.mark.django_db
 def test_tick_latest_200_when_id_differs(client):
-    old_tick = make_tick("2024-01-01T08:00:00Z")
-    latest = make_tick("2024-01-01T10:00:00Z")
+    old_tick = make_tick("2024-01-01T08:00:00Z", active=True)
+    latest = make_tick("2024-01-01T10:00:00Z", active=True)
     response = client.get(f"/api/ticks/latest/?last_tick_id={old_tick.pk}")
     assert response.status_code == 200
     assert response.json()["id"] == latest.pk
@@ -205,7 +205,7 @@ def test_tick_latest_200_when_id_differs(client):
 
 @pytest.mark.django_db
 def test_tick_latest_200_when_id_invalid(client):
-    make_tick()
+    make_tick(active=True)
     response = client.get("/api/ticks/latest/?last_tick_id=notanint")
     assert response.status_code == 200
 
@@ -213,4 +213,11 @@ def test_tick_latest_200_when_id_invalid(client):
 @pytest.mark.django_db
 def test_tick_latest_404_when_no_ticks_regardless_of_param(client):
     response = client.get("/api/ticks/latest/?last_tick_id=1")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_tick_latest_skips_inactive_tick(client):
+    make_tick(active=False)
+    response = client.get("/api/ticks/latest/")
     assert response.status_code == 404
