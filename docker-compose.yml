@@ -7,8 +7,7 @@ services:
     restart: unless-stopped
 
   backend:
-    build:
-      context: ./backend
+    image: ghcr.io/tobysuch/tokenbury/backend:latest
     env_file: .env
     volumes:
       - media:/app/media
@@ -17,9 +16,7 @@ services:
     restart: unless-stopped
 
   caddy:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
+    image: ghcr.io/tobysuch/tokenbury/caddy:latest
     ports:
       - "80:80"
       - "443:443"
