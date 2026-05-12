@@ -1,7 +1,7 @@
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path
+from django.views.static import serve
 from world.views import (
     agent_detail,
     health,
@@ -21,4 +21,5 @@ urlpatterns = [
     path("api/ticks/days/", tick_days),
     path("api/ticks/latest/", tick_latest),
     path("api/ticks/<int:pk>/", tick_detail),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    path("media/<path:path>", serve, {"document_root": settings.MEDIA_ROOT}),
+]

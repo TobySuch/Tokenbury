@@ -1,4 +1,4 @@
-.PHONY: dev backend frontend install migrate makemigrations shell createsuperuser lint format test ticker
+.PHONY: dev backend frontend prod prod-down install migrate makemigrations shell createsuperuser lint format test ticker
 
 # ─── Dev Servers ─────────────────────────────────────────────────────────────
 
@@ -10,6 +10,14 @@ backend:
 
 frontend:
 	cd frontend && bun run dev
+
+# ─── Production (Docker) ─────────────────────────────────────────────────────
+
+prod:
+	docker compose up --build -d
+
+prod-down:
+	docker compose down
 
 # ─── Dependencies ─────────────────────────────────────────────────────────────
 
