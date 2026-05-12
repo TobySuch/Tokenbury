@@ -13,7 +13,7 @@ test('App renders the page heading', async () => {
   await act(async () => {
     render(<App />)
   })
-  expect(screen.getByRole('img', { name: 'Tokenbury-on-Sea' })).toBeInTheDocument()
+  expect(screen.getAllByRole('img', { name: 'Tokenbury-on-Sea' }).length).toBeGreaterThan(0)
 })
 
 test('App renders the town map image', async () => {

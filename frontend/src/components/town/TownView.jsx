@@ -48,7 +48,7 @@ const BORDER_COLOURS = [
   'rgb(202,138,4)',
 ]
 
-export default function TownView({ locations = [], tickData, onAgentChange }) {
+export default function TownView({ locations = [], tickData, onAgentChange, className = '' }) {
   const isDebug = new URLSearchParams(window.location.search).get('debug') === '1'
   const [naturalSize, setNaturalSize] = useState(null)
   const [hoverCoords, setHoverCoords] = useState(null)
@@ -140,15 +140,17 @@ export default function TownView({ locations = [], tickData, onAgentChange }) {
     setHoverCoords(null)
   }
 
-  // Limit the map width so its height never pushes the scrubber below the fold.
-  // 20rem accounts for the header (h-28 logo) + container padding + scrubber height.
+  // Limit the map width so its height never pushes content below the fold.
+  // --map-height-offset (set in index.css) varies by screen size and orientation:
+  // large/portrait uses 20rem (accounts for header + scrubber), landscape small
+  // uses 4.5rem (scrubber is hidden, shorter header).
   const mapMaxWidth = naturalSize
-    ? `calc((100vh - 20rem) * ${naturalSize.width / naturalSize.height})`
+    ? `calc((100vh - var(--map-height-offset)) * ${naturalSize.width / naturalSize.height})`
     : undefined
 
   return (
     <div
-      className={`relative mx-auto w-full overflow-hidden rounded-2xl shadow-md ${isDebug ? 'cursor-crosshair' : ''}`}
+      className={`relative mx-auto w-full overflow-hidden rounded-2xl shadow-md ${isDebug ? 'cursor-crosshair' : ''} ${className}`}
       style={mapMaxWidth ? { maxWidth: mapMaxWidth } : undefined}
       onMouseMove={isDebug ? handleMouseMove : undefined}
       onMouseLeave={isDebug ? handleMouseLeave : undefined}

@@ -3,3 +3,17 @@
 body {
   font-family: 'Lora', serif;
 }
+
+/* Offset subtracted from 100vh when computing map max-width.
+   Large screens / portrait: account for header + padding + scrubber below map.
+   Landscape small screens: scrubber is hidden and header is shorter, so use a
+   smaller offset so the map fills most of the viewport height. */
+:root {
+  --map-height-offset: 20rem;
+}
+@media (max-width: 1023px) and (orientation: landscape) {
+  :root {
+    /* No header on small landscape — offset is just the container's vertical padding */
+    --map-height-offset: 2rem;
+  }
+}
