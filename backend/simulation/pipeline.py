@@ -109,6 +109,12 @@ class LocationResolutionStep(PerAgentStep):
             needs_plan=needs_plan,
         )
 
+        logger.info(
+            "LLM call — tick %d (%s) | agent %s | phase LocationResolution",
+            ctx.tick.id,
+            ctx.tick.in_game_time.strftime("%H:%M"),
+            agent.name,
+        )
         raw_response = call_llm(prompt)
         ctx.phase1_prompts[agent.id] = prompt
         ctx.phase1_responses[agent.id] = raw_response
@@ -196,6 +202,12 @@ class ActivityGenerationStep(PerAgentStep):
             co_located,
         )
 
+        logger.info(
+            "LLM call — tick %d (%s) | agent %s | phase ActivityGeneration",
+            ctx.tick.id,
+            ctx.tick.in_game_time.strftime("%H:%M"),
+            agent.name,
+        )
         raw_response = call_llm(prompt)
 
         try:
