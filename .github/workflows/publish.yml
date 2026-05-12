@@ -39,14 +39,3 @@ jobs:
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
 
-      - name: Build and push caddy
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./frontend/Dockerfile
-          push: true
-          tags: |
-            ghcr.io/tobysuch/tokenbury/caddy:latest
-            ghcr.io/tobysuch/tokenbury/caddy:${{ github.sha }}
-          cache-from: type=gha,scope=caddy
-          cache-to: type=gha,scope=caddy,mode=max

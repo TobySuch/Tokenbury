@@ -16,11 +16,13 @@ services:
     restart: unless-stopped
 
   caddy:
-    image: ghcr.io/tobysuch/tokenbury/caddy:latest
+    image: caddy:alpine
     ports:
       - "80:80"
       - "443:443"
     volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend/dist:/srv:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
