@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { fetchLocations, fetchLatestTick } from '../../api/client'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import AgentSprite from '../agents/AgentSprite'
 import TickClock from './TickClock'
 
@@ -49,68 +48,56 @@ const BORDER_COLOURS = [
   'rgb(202,138,4)',
 ]
 
-export default function TownView({ onAgentChange }) {
+export default function TownView({ locations = [], tickData, onAgentChange }) {
   const isDebug = new URLSearchParams(window.location.search).get('debug') === '1'
-  const [locations, setLocations] = useState([])
-  const [agentsByLocation, setAgentsByLocation] = useState(new Map())
   const [naturalSize, setNaturalSize] = useState(null)
   const [hoverCoords, setHoverCoords] = useState(null)
   const [hoveredAgent, setHoveredAgent] = useState(null)
   const [lockedAgent, setLockedAgent] = useState(null)
-  const [currentInGameTime, setCurrentInGameTime] = useState(null)
   const lockedAgentRef = useRef(null)
   const imgRef = useRef(null)
-  const currentTickIdRef = useRef(null)
-  const locationsRef = useRef([])
 
-  const applyTick = useCallback(
-    function applyTick(tick, locs) {
-      if (!tick?.agent_states) return
-      currentTickIdRef.current = tick.id
-      setCurrentInGameTime(tick.in_game_time)
-      const byLoc = new Map()
-      for (const state of tick.agent_states) {
-        if (!state.location_slug) continue
-        if (!byLoc.has(state.location_slug)) byLoc.set(state.location_slug, [])
-        byLoc.get(state.location_slug).push(state)
-      }
-      setAgentsByLocation(byLoc)
-      if (lockedAgentRef.current) {
-        const updated = tick.agent_states.find(
-          (s) => s.agent_id === lockedAgentRef.current.agent_id
-        )
-        if (updated) {
-          const loc = locs.find((l) => l.slug === updated.location_slug)
-          const enriched = enrichAgent(updated, loc ?? { name: null, description: null })
-          setLockedAgent(enriched)
-          lockedAgentRef.current = enriched
-          onAgentChange?.(enriched)
-        }
-      }
-    },
-    [onAgentChange]
-  )
-
-  useEffect(() => {
-    Promise.all([fetchLocations(), fetchLatestTick()]).then(([locs, tick]) => {
-      setLocations(locs)
-      locationsRef.current = locs
-      if (tick) applyTick(tick, locs)
-    })
-  }, [applyTick])
-
-  useEffect(() => {
-    locationsRef.current = locations
-  }, [locations])
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      fetchLatestTick(currentTickIdRef.current).then((tick) => {
-        if (tick) applyTick(tick, locationsRef.current)
+  // Each agent gets an individual absolutely-positioned wrapper keyed by agent_id.
+  // This gives React a stable DOM element to apply CSS transitions to when the
+  // agent's location (and therefore left/top) changes between ticks.
+  const agentPositions = useMemo(() => {
+    if (!tickData?.agent_states || !naturalSize) return []
+    const byLoc = new Map()
+    for (const state of tickData.agent_states) {
+      if (!state.location_slug) continue
+      const loc = locations.find((l) => l.slug === state.location_slug)
+      if (!loc) continue
+      if (!byLoc.has(state.location_slug)) byLoc.set(state.location_slug, [])
+      byLoc.get(state.location_slug).push({ state, loc })
+    }
+    const result = []
+    for (const [, agents] of byLoc) {
+      agents.sort((a, b) => a.state.agent_id - b.state.agent_id)
+      const n = agents.length
+      agents.forEach(({ state, loc }, i) => {
+        const cx = ((loc.bbox_x1 + loc.bbox_x2) / 2 / naturalSize.width) * 100
+        const cy = ((loc.bbox_y1 + loc.bbox_y2) / 2 / naturalSize.height) * 100
+        // Spread co-located agents horizontally, centred on the location midpoint
+        const offsetPct = (i - (n - 1) / 2) * 3.5
+        result.push({ state, loc, cx: cx + offsetPct, cy })
       })
-    }, 30_000)
-    return () => clearInterval(id)
-  }, [applyTick])
+    }
+    return result
+  }, [tickData, locations, naturalSize])
+
+  useEffect(() => {
+    if (!tickData?.agent_states || !lockedAgentRef.current) return
+    const updated = tickData.agent_states.find(
+      (s) => s.agent_id === lockedAgentRef.current.agent_id
+    )
+    if (updated) {
+      const loc = locations.find((l) => l.slug === updated.location_slug)
+      const enriched = enrichAgent(updated, loc ?? { name: null, description: null })
+      setLockedAgent(enriched)
+      lockedAgentRef.current = enriched
+      onAgentChange?.(enriched)
+    }
+  }, [tickData, locations, onAgentChange])
 
   function enrichAgent(agent, loc) {
     return {
@@ -153,13 +140,20 @@ export default function TownView({ onAgentChange }) {
     setHoverCoords(null)
   }
 
+  // Limit the map width so its height never pushes the scrubber below the fold.
+  // 15rem accounts for the header + container padding + scrubber height (~240px).
+  const mapMaxWidth = naturalSize
+    ? `calc((100vh - 15rem) * ${naturalSize.width / naturalSize.height})`
+    : undefined
+
   return (
     <div
       className={`relative w-full overflow-hidden rounded-2xl shadow-md ${isDebug ? 'cursor-crosshair' : ''}`}
+      style={mapMaxWidth ? { maxWidth: mapMaxWidth } : undefined}
       onMouseMove={isDebug ? handleMouseMove : undefined}
       onMouseLeave={isDebug ? handleMouseLeave : undefined}
     >
-      <TickClock inGameTime={currentInGameTime} />
+      <TickClock inGameTime={tickData?.in_game_time} />
       <img
         ref={imgRef}
         src="/assets/map/town.png"
@@ -199,32 +193,22 @@ export default function TownView({ onAgentChange }) {
             </div>
           )
         })}
-      {naturalSize &&
-        locations
-          .filter((loc) => agentsByLocation.has(loc.slug))
-          .map((loc) => {
-            const cx = ((loc.bbox_x1 + loc.bbox_x2) / 2 / naturalSize.width) * 100
-            const cy = ((loc.bbox_y1 + loc.bbox_y2) / 2 / naturalSize.height) * 100
-            return (
-              <div
-                key={loc.slug}
-                className="absolute flex gap-1 transition-all duration-[2000ms]"
-                style={{ left: `${cx}%`, top: `${cy}%`, transform: 'translate(-50%, -50%)' }}
-              >
-                {agentsByLocation.get(loc.slug).map((a) => (
-                  <AgentSprite
-                    key={a.agent_id}
-                    name={a.agent_name}
-                    spriteUrl={a.agent_sprite_url}
-                    isActive={a.agent_id === (hoveredAgent?.agent_id ?? lockedAgent?.agent_id)}
-                    onHover={() => handleSpriteHover(enrichAgent(a, loc))}
-                    onHoverEnd={handleSpriteHoverEnd}
-                    onClick={() => handleSpriteClick(enrichAgent(a, loc))}
-                  />
-                ))}
-              </div>
-            )
-          })}
+      {agentPositions.map(({ state, loc, cx, cy }) => (
+        <div
+          key={state.agent_id}
+          className="absolute transition-all duration-[2000ms]"
+          style={{ left: `${cx}%`, top: `${cy}%`, transform: 'translate(-50%, -50%)' }}
+        >
+          <AgentSprite
+            name={state.agent_name}
+            spriteUrl={state.agent_sprite_url}
+            isActive={state.agent_id === (hoveredAgent?.agent_id ?? lockedAgent?.agent_id)}
+            onHover={() => handleSpriteHover(enrichAgent(state, loc))}
+            onHoverEnd={handleSpriteHoverEnd}
+            onClick={() => handleSpriteClick(enrichAgent(state, loc))}
+          />
+        </div>
+      ))}
       {isDebug && hoverCoords && (
         <div className="pointer-events-none absolute bottom-1.5 right-2 rounded bg-black/70 px-1.5 py-0.5 font-mono text-xs text-white">
           {hoverCoords.x}, {hoverCoords.y}

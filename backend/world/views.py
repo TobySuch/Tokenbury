@@ -32,7 +32,17 @@ def locations(request):
 
 @api_view(["GET"])
 def tick_list(request):
-    return Response(TickListSerializer(Tick.objects.all(), many=True).data)
+    qs = Tick.objects.all()
+    date_str = request.query_params.get("date")
+    if date_str:
+        qs = qs.filter(in_game_time__date=date_str)
+    return Response(TickListSerializer(qs, many=True).data)
+
+
+@api_view(["GET"])
+def tick_days(request):
+    dates = Tick.objects.dates("in_game_time", "day", order="ASC")
+    return Response([d.isoformat() for d in dates])
 
 
 @api_view(["GET"])

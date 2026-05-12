@@ -120,6 +120,46 @@ def test_tick_list_returns_ticks(client):
     assert "agent_states" not in data[0]
 
 
+@pytest.mark.django_db
+def test_tick_list_filtered_by_date(client):
+    make_tick("2024-01-01T09:00:00Z")
+    make_tick("2024-01-02T09:00:00Z")
+    response = client.get("/api/ticks/?date=2024-01-01")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["in_game_time"].startswith("2024-01-01")
+
+
+@pytest.mark.django_db
+def test_tick_list_date_filter_no_match(client):
+    make_tick("2024-01-01T09:00:00Z")
+    response = client.get("/api/ticks/?date=2024-01-02")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+# --- /api/ticks/days/ ---
+
+
+@pytest.mark.django_db
+def test_tick_days_empty(client):
+    response = client.get("/api/ticks/days/")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+@pytest.mark.django_db
+def test_tick_days_returns_sorted_dates(client):
+    make_tick("2024-01-02T09:00:00Z")
+    make_tick("2024-01-01T10:00:00Z")
+    make_tick("2024-01-01T09:00:00Z")
+    response = client.get("/api/ticks/days/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data == ["2024-01-01", "2024-01-02"]
+
+
 # --- /api/ticks/<id>/ ---
 
 
