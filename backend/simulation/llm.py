@@ -95,7 +95,7 @@ def call_llm(prompt: str) -> str:
             try:
                 meta = json.loads(err_body).get("error", {}).get("metadata") or {}
                 retry_after_body = meta.get("retry_after_seconds")
-            except Exception:  # noqa: BLE001
+            except json.JSONDecodeError:
                 retry_after_body = None
             retry_after_header = exc.headers.get("Retry-After")
             raw_delay = retry_after_body or retry_after_header
