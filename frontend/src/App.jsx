@@ -180,11 +180,13 @@ function App() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#faf5e4] text-[#3d2b1f]">
-      <header className="shrink-0 border-b border-[#d4bc8a] p-4">
-        <h1 className="text-2xl font-bold italic">Tokenbury-on-Sea</h1>
+      <header className="shrink-0 border-b border-[#d4bc8a] p-1">
+        <h1>
+          <img src="/assets/logo.png" alt="Tokenbury-on-Sea" className="h-10 lg:h-28 w-auto" />
+        </h1>
       </header>
       <main className="flex flex-1 flex-col overflow-auto lg:flex-row lg:overflow-hidden">
-        <div className="min-w-0 p-4 lg:w-3/4 lg:flex-none">
+        <div className="min-w-0 p-4 lg:w-2/3 lg:flex-none">
           <TownView locations={locations} tickData={tickData} onAgentChange={setSelectedAgent} />
           <TimelineScrubber
             days={days}
@@ -200,7 +202,7 @@ function App() {
             onScrubTick={handleScrubTick}
           />
         </div>
-        <aside className="border-t border-[#d4bc8a] p-4 lg:w-1/4 lg:border-l lg:border-t-0">
+        <aside className="border-t border-[#d4bc8a] p-4 lg:w-1/3 lg:border-l lg:border-t-0">
           <AgentPanel agent={selectedAgent} />
         </aside>
       </main>

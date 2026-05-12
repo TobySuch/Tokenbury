@@ -141,14 +141,14 @@ export default function TownView({ locations = [], tickData, onAgentChange }) {
   }
 
   // Limit the map width so its height never pushes the scrubber below the fold.
-  // 15rem accounts for the header + container padding + scrubber height (~240px).
+  // 20rem accounts for the header (h-28 logo) + container padding + scrubber height.
   const mapMaxWidth = naturalSize
-    ? `calc((100vh - 15rem) * ${naturalSize.width / naturalSize.height})`
+    ? `calc((100vh - 20rem) * ${naturalSize.width / naturalSize.height})`
     : undefined
 
   return (
     <div
-      className={`relative w-full overflow-hidden rounded-2xl shadow-md ${isDebug ? 'cursor-crosshair' : ''}`}
+      className={`relative mx-auto w-full overflow-hidden rounded-2xl shadow-md ${isDebug ? 'cursor-crosshair' : ''}`}
       style={mapMaxWidth ? { maxWidth: mapMaxWidth } : undefined}
       onMouseMove={isDebug ? handleMouseMove : undefined}
       onMouseLeave={isDebug ? handleMouseLeave : undefined}
