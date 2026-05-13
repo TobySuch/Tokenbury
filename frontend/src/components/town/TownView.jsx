@@ -162,13 +162,15 @@ export default function TownView({
       onMouseLeave={isDebug ? handleMouseLeave : undefined}
     >
       <TickClock inGameTime={tickData?.in_game_time} />
-      <img
-        ref={imgRef}
-        src={instance?.map_image_url ?? '/assets/map/town.png'}
-        alt="Tokenbury-on-Sea map"
-        className="block w-full"
-        onLoad={handleImageLoad}
-      />
+      {instance?.map_image_url && (
+        <img
+          ref={imgRef}
+          src={instance.map_image_url}
+          alt="Tokenbury-on-Sea map"
+          className="block w-full"
+          onLoad={handleImageLoad}
+        />
+      )}
       {isDebug &&
         naturalSize &&
         locations.map((loc, i) => {

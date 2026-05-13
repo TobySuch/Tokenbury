@@ -1,6 +1,8 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import TownView from './TownView'
 
+const INSTANCE = { name: 'Tokenbury', slug: 'tokenbury', map_image_url: '/media/maps/town.png' }
+
 const LOCATIONS = [
   {
     id: 1,
@@ -59,7 +61,7 @@ function setDebugMode(on) {
 }
 
 function renderAndLoad(props = {}) {
-  render(<TownView locations={LOCATIONS} {...props} />)
+  render(<TownView instance={INSTANCE} locations={LOCATIONS} {...props} />)
   const img = screen.getByRole('img', { name: /tokenbury/i })
   Object.defineProperty(img, 'naturalWidth', { value: 1000, configurable: true })
   Object.defineProperty(img, 'naturalHeight', { value: 800, configurable: true })
@@ -72,9 +74,17 @@ afterEach(() => {
   setDebugMode(false)
 })
 
-test('renders the map image', () => {
+test('renders the map image when instance has a map_image_url', () => {
+  render(<TownView instance={INSTANCE} />)
+  expect(screen.getByRole('img', { name: /tokenbury/i })).toHaveAttribute(
+    'src',
+    '/media/maps/town.png'
+  )
+})
+
+test('renders no map image when instance is not provided', () => {
   render(<TownView />)
-  expect(screen.getByRole('img', { name: /tokenbury/i })).toBeInTheDocument()
+  expect(screen.queryByRole('img', { name: /tokenbury/i })).not.toBeInTheDocument()
 })
 
 test('uses map_image_url from instance prop when provided', () => {
@@ -83,14 +93,6 @@ test('uses map_image_url from instance prop when provided', () => {
   expect(screen.getByRole('img', { name: /tokenbury.*map/i })).toHaveAttribute(
     'src',
     '/media/maps/custom.png'
-  )
-})
-
-test('falls back to static map when instance is not provided', () => {
-  render(<TownView />)
-  expect(screen.getByRole('img', { name: /tokenbury.*map/i })).toHaveAttribute(
-    'src',
-    '/assets/map/town.png'
   )
 })
 
@@ -122,7 +124,7 @@ test('no bounding boxes rendered without debug mode', () => {
 
 test('shows coords on mouse move over image in debug mode', () => {
   setDebugMode(true)
-  render(<TownView locations={[]} />)
+  render(<TownView instance={INSTANCE} locations={[]} />)
   const img = screen.getByRole('img', { name: /tokenbury/i })
   Object.defineProperty(img, 'naturalWidth', { value: 1000, configurable: true })
   Object.defineProperty(img, 'naturalHeight', { value: 800, configurable: true })
@@ -177,7 +179,9 @@ test('sprites update when tickData prop changes', () => {
     created_at: '2026-05-10T10:01:00Z',
     agent_states: [{ ...TICK_WITH_AGENTS.agent_states[0], location_slug: 'pub' }],
   }
-  const { rerender } = render(<TownView locations={LOCATIONS} tickData={TICK_WITH_AGENTS} />)
+  const { rerender } = render(
+    <TownView instance={INSTANCE} locations={LOCATIONS} tickData={TICK_WITH_AGENTS} />
+  )
   const img = screen.getByRole('img', { name: /tokenbury/i })
   Object.defineProperty(img, 'naturalWidth', { value: 1000, configurable: true })
   Object.defineProperty(img, 'naturalHeight', { value: 800, configurable: true })
