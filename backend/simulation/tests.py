@@ -10,7 +10,12 @@ from world.models import Agent, AgentTick, DailyPlan, Instance, Location, Tick
 from simulation.llm import LLMError, call_llm
 from simulation.pipeline import TickContext, _extract_json, _normalise
 from simulation.prompts import build_activity_prompt, build_location_prompt
-from simulation.runner import SimulationAlreadyUpToDate, _round_to_interval, run_tick
+from simulation.runner import (
+    SimulationAlreadyUpToDate,
+    _ceil_to_interval,
+    _round_to_interval,
+    run_tick,
+)
 
 
 # --- factories ---
@@ -710,18 +715,42 @@ def test_round_to_interval_clears_subseconds():
     assert result.microsecond == 0
 
 
+# --- _ceil_to_interval tests ---
+
+
+def test_ceil_to_interval_rounds_up():
+    dt = tz.now().replace(hour=10, minute=7, second=30, microsecond=0)
+    result = _ceil_to_interval(dt, 15)
+    assert result.hour == 10
+    assert result.minute == 15
+    assert result.second == 0
+
+
+def test_ceil_to_interval_on_exact_boundary():
+    dt = tz.now().replace(hour=10, minute=15, second=0, microsecond=0)
+    result = _ceil_to_interval(dt, 15)
+    assert result.hour == 10
+    assert result.minute == 15
+
+
+def test_ceil_to_interval_never_rounds_back():
+    dt = tz.now().replace(hour=10, minute=1, second=0, microsecond=0)
+    result = _ceil_to_interval(dt, 15)
+    assert result >= dt
+
+
 # --- catchup tests ---
 
 
 @pytest.mark.django_db
 @patch("simulation.pipeline.call_llm", side_effect=two_phase_responses(1))
-def test_run_tick_catchup_jumps_to_rounded_now(_mock, settings):
+def test_run_tick_catchup_jumps_to_ceil_now(_mock, settings):
     make_location()
     old_time = tz.now() - timedelta(hours=5)
     make_tick(in_game_time=old_time, active=True)
     tick = run_tick(catchup=True)
-    half_interval = timedelta(minutes=settings.TICK_INTERVAL_MINUTES / 2)
-    assert abs(tick.in_game_time - tz.now()) <= half_interval
+    expected = _ceil_to_interval(tz.now(), settings.TICK_INTERVAL_MINUTES)
+    assert abs((tick.in_game_time - expected).total_seconds()) < 2
 
 
 @pytest.mark.django_db
@@ -736,10 +765,10 @@ def test_run_tick_catchup_noop_when_sim_is_ahead(settings):
 
 
 @pytest.mark.django_db
-def test_run_tick_catchup_noop_when_rounded_equals_last_tick(settings):
+def test_run_tick_catchup_noop_when_ceiled_equals_last_tick(settings):
     make_location()
-    rounded_now = _round_to_interval(tz.now(), settings.TICK_INTERVAL_MINUTES)
-    existing_tick = make_tick(in_game_time=rounded_now, active=True)
+    ceiled_now = _ceil_to_interval(tz.now(), settings.TICK_INTERVAL_MINUTES)
+    existing_tick = make_tick(in_game_time=ceiled_now, active=True)
     with pytest.raises(SimulationAlreadyUpToDate) as exc_info:
         run_tick(catchup=True)
     assert exc_info.value.tick.id == existing_tick.id

@@ -1,4 +1,6 @@
 import pytest
+from django.utils import timezone as tz
+from datetime import timedelta
 from world.models import Agent, AgentTick, DailyPlan, Instance, Location, Tick
 
 
@@ -374,6 +376,78 @@ def test_instance_endpoint_returns_active_instance(client):
     assert data["name"] == "Tokenbury-on-Sea"
     assert data["slug"] == "tokenbury-on-sea"
     assert "map_image_url" in data
+
+
+# --- API_HIDE_FUTURE_TICKS ---
+
+
+@pytest.mark.django_db
+def test_tick_list_excludes_future_ticks_when_flag_on(client, settings):
+    settings.API_HIDE_FUTURE_TICKS = True
+    make_tick("2024-01-01T09:00:00Z")
+    future = Tick.objects.create(
+        in_game_time=tz.now() + timedelta(hours=1),
+        active=True,
+        instance=make_instance(),
+    )
+    response = client.get("/api/ticks/")
+    assert response.status_code == 200
+    ids = [t["id"] for t in response.json()]
+    assert future.pk not in ids
+
+
+@pytest.mark.django_db
+def test_tick_list_includes_future_ticks_when_flag_off(client, settings):
+    settings.API_HIDE_FUTURE_TICKS = False
+    future = Tick.objects.create(
+        in_game_time=tz.now() + timedelta(hours=1),
+        active=True,
+        instance=make_instance(),
+    )
+    response = client.get("/api/ticks/")
+    assert response.status_code == 200
+    ids = [t["id"] for t in response.json()]
+    assert future.pk in ids
+
+
+@pytest.mark.django_db
+def test_tick_latest_excludes_future_tick_when_flag_on(client, settings):
+    settings.API_HIDE_FUTURE_TICKS = True
+    Tick.objects.create(
+        in_game_time=tz.now() + timedelta(hours=1),
+        active=True,
+        instance=make_instance(),
+    )
+    response = client.get("/api/ticks/latest/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_tick_detail_excludes_future_tick_when_flag_on(client, settings):
+    settings.API_HIDE_FUTURE_TICKS = True
+    future = Tick.objects.create(
+        in_game_time=tz.now() + timedelta(hours=1),
+        active=True,
+        instance=make_instance(),
+    )
+    response = client.get(f"/api/ticks/{future.pk}/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_tick_days_excludes_future_days_when_flag_on(client, settings):
+    settings.API_HIDE_FUTURE_TICKS = True
+    make_tick("2024-01-01T09:00:00Z")
+    Tick.objects.create(
+        in_game_time=tz.now() + timedelta(days=1),
+        active=True,
+        instance=make_instance(),
+    )
+    response = client.get("/api/ticks/days/")
+    assert response.status_code == 200
+    dates = response.json()
+    assert len(dates) == 1
+    assert dates[0] == "2024-01-01"
 
 
 @pytest.mark.django_db

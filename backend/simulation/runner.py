@@ -1,4 +1,5 @@
 import logging
+import math
 from datetime import datetime, timedelta
 
 from django.conf import settings
@@ -30,6 +31,14 @@ def _round_to_interval(dt: datetime, interval_minutes: int) -> datetime:
     return epoch + timedelta(seconds=rounded)
 
 
+def _ceil_to_interval(dt: datetime, interval_minutes: int) -> datetime:
+    total_seconds = interval_minutes * 60
+    epoch = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    delta = (dt - epoch).total_seconds()
+    ceiled = math.ceil(delta / total_seconds) * total_seconds
+    return epoch + timedelta(seconds=ceiled)
+
+
 def run_tick(catchup: bool = False) -> Tick:
     interval = settings.TICK_INTERVAL_MINUTES
     instance = Instance.objects.filter(active=True).first()
@@ -43,9 +52,9 @@ def run_tick(catchup: bool = False) -> Tick:
     if previous_tick is None:
         in_game_time = _round_to_interval(tz.now(), interval)
     elif catchup:
-        rounded = _round_to_interval(tz.now(), interval)
-        if rounded > previous_tick.in_game_time:
-            in_game_time = rounded
+        ceiled = _ceil_to_interval(tz.now(), interval)
+        if ceiled > previous_tick.in_game_time:
+            in_game_time = ceiled
         else:
             raise SimulationAlreadyUpToDate(previous_tick)
     else:
