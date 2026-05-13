@@ -7,10 +7,11 @@ services:
     restart: unless-stopped
 
   backend:
-    image: ghcr.io/tobysuch/tokenbury/backend:latest
+    image: ghcr.io/tobysuch/tokenbury:latest
     env_file: .env
     volumes:
       - media:/app/media
+      - frontend_dist:/srv
     depends_on:
       - db
     restart: unless-stopped
@@ -22,7 +23,7 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./frontend/dist:/srv:ro
+      - frontend_dist:/srv:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
@@ -34,3 +35,4 @@ volumes:
   media:
   caddy_data:
   caddy_config:
+  frontend_dist:
