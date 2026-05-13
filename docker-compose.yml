@@ -19,7 +19,7 @@ services:
   ticker:
     image: ghcr.io/tobysuch/tokenbury:latest
     env_file: .env
-    command: ./ticker_entrypoint.sh
+    entrypoint: ./ticker_entrypoint.sh
     depends_on:
       - db
     restart: unless-stopped
