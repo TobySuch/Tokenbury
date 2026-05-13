@@ -1,7 +1,11 @@
+import fcntl
+
 from django.core.management.base import BaseCommand
 
 from simulation.runner import SimulationAlreadyUpToDate, run_tick
 from world.models import AgentTick
+
+LOCK_FILE = "/tmp/tokenbury-ticker.lock"
 
 
 class Command(BaseCommand):
@@ -15,7 +19,24 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        catchup = options["catchup"]
+        lock_fd = open(LOCK_FILE, "w")
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            self.stdout.write(
+                self.style.WARNING(
+                    "Another ticker process is already running — skipping."
+                )
+            )
+            lock_fd.close()
+            return
+        try:
+            self._run(options["catchup"])
+        finally:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            lock_fd.close()
+
+    def _run(self, catchup: bool) -> None:
         if catchup:
             self.stdout.write("Catchup mode: jumping to current real-world time.")
         try:

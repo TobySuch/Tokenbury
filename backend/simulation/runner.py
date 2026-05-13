@@ -1,3 +1,4 @@
+import json
 import logging
 import math
 from datetime import datetime, timedelta
@@ -12,6 +13,7 @@ from .pipeline import (
     LocationResolutionStep,
     PerAgentStep,
     TickContext,
+    _extract_json,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,12 +41,106 @@ def _ceil_to_interval(dt: datetime, interval_minutes: int) -> datetime:
     return epoch + timedelta(seconds=ceiled)
 
 
+def _resume_tick(tick: Tick, instance: Instance) -> None:
+    agents = list(Agent.objects.filter(active=True, instance=instance))
+    locations = list(Location.objects.filter(instance=instance))
+
+    completed_ids = set(
+        AgentTick.objects.filter(tick=tick).values_list("agent_id", flat=True)
+    )
+    missing_agents = [a for a in agents if a.id not in completed_ids]
+
+    logger.info(
+        "Resuming tick %d: %d/%d complete, re-running %d agent(s)",
+        tick.id,
+        len(completed_ids),
+        len(agents),
+        len(missing_agents),
+    )
+
+    if not missing_agents:
+        tick.active = True
+        tick.save(update_fields=["active"])
+        return
+
+    previous_complete = (
+        Tick.objects
+        .filter(
+            instance=instance,
+            active=True,
+            in_game_time__lt=tick.in_game_time,
+        )
+        .order_by("-in_game_time")
+        .first()
+    )
+
+    ctx = TickContext(
+        tick=tick,
+        agents=agents,
+        locations=locations,
+        location_by_slug={loc.slug: loc for loc in locations},
+        world_state=_build_world_state(previous_complete),
+    )
+
+    for at in AgentTick.objects.filter(tick=tick).select_related("agent", "location"):
+        ctx.resolved_locations[at.agent_id] = at.location
+        ctx.phase1_prompts[at.agent_id] = at.raw_prompts.get(
+            "LocationResolutionStep", ""
+        )
+        ctx.phase1_responses[at.agent_id] = at.raw_responses.get(
+            "LocationResolutionStep", ""
+        )
+        try:
+            data = json.loads(
+                _extract_json(at.raw_responses.get("LocationResolutionStep", ""))
+            )
+            ctx.intentions[at.agent_id] = data.get("intention", "")
+        except json.JSONDecodeError, ValueError:
+            ctx.intentions[at.agent_id] = ""
+
+    phase1 = LocationResolutionStep()
+    for agent in missing_agents:
+        try:
+            phase1.run(agent, ctx)
+        except Exception:
+            logger.exception(
+                "[Resume/LocationResolutionStep] Failed for agent %s (id=%d)",
+                agent.name,
+                agent.id,
+            )
+
+    phase2 = ActivityGenerationStep()
+    for agent in missing_agents:
+        try:
+            phase2.run(agent, ctx)
+        except Exception:
+            logger.exception(
+                "[Resume/ActivityGenerationStep] Failed for agent %s (id=%d)",
+                agent.name,
+                agent.id,
+            )
+
+    tick.active = True
+    tick.save(update_fields=["active"])
+    logger.info("Tick %d resumed and completed", tick.id)
+
+
+def _recover_abandoned_ticks(instance: Instance) -> None:
+    abandoned = list(
+        Tick.objects.filter(instance=instance, active=False).order_by("in_game_time")
+    )
+    if abandoned:
+        logger.warning("Found %d abandoned tick(s); resuming", len(abandoned))
+    for tick in abandoned:
+        _resume_tick(tick, instance)
+
+
 def run_tick(catchup: bool = False) -> Tick:
     interval = settings.TICK_INTERVAL_MINUTES
     instance = Instance.objects.filter(active=True).first()
 
-    # Intentionally no active filter — even a partially-processed tick represents
-    # a point in time and partial world state that is useful context for the next run.
+    _recover_abandoned_ticks(instance)
+
     previous_tick = (
         Tick.objects.filter(instance=instance).order_by("-in_game_time").first()
     )

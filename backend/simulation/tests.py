@@ -60,7 +60,7 @@ def make_location(slug="harbour_cafe", name="Harbour Café", instance=None):
     )
 
 
-def make_tick(in_game_time=None, active=False, instance=None):
+def make_tick(in_game_time=None, active=True, instance=None):
     if in_game_time is None:
         in_game_time = tz.now()
     if instance is None:
@@ -607,6 +607,77 @@ def test_run_tick_stores_raw_prompts_and_responses(_mock):
     assert len(at.raw_prompts["LocationResolutionStep"]) > 0
     assert len(at.raw_prompts["ActivityGenerationStep"]) > 0
     assert at.raw_responses["ActivityGenerationStep"] == VALID_LLM_RESPONSE
+
+
+# --- abandoned tick recovery tests ---
+
+
+@pytest.mark.django_db
+def test_run_tick_resumes_partially_complete_abandoned_tick(settings):
+    """Crash during Phase 2: agent A has AgentTick, agent B is missing. B should be resumed."""
+    location = make_location()
+    agent_a = make_agent("AgentA")
+    agent_b = make_agent("AgentB")
+    abandoned_time = tz.now() - timedelta(hours=1)
+    abandoned = make_tick(in_game_time=abandoned_time, active=False)
+    make_agent_tick(agent_a, abandoned, location=location)
+
+    # Resume calls: Phase 1 + Phase 2 for agent B (2 calls)
+    # New tick calls: Phase 1 A, Phase 1 B, Phase 2 A, Phase 2 B (4 calls)
+    side_effects = two_phase_responses(1) + two_phase_responses(2)
+    with patch("simulation.pipeline.call_llm", side_effect=side_effects):
+        new_tick = run_tick()
+
+    abandoned.refresh_from_db()
+    assert abandoned.active is True
+    assert AgentTick.objects.filter(tick=abandoned, agent=agent_b).exists()
+    assert AgentTick.objects.filter(tick=abandoned).count() == 2
+
+    expected = abandoned_time + timedelta(minutes=settings.TICK_INTERVAL_MINUTES)
+    assert abs((new_tick.in_game_time - expected).total_seconds()) < 1
+
+
+@pytest.mark.django_db
+def test_run_tick_resumes_fully_incomplete_abandoned_tick(settings):
+    """Crash during Phase 1: no AgentTick records at all. Full pipeline runs for all agents."""
+    make_location()
+    make_agent("AgentA")
+    make_agent("AgentB")
+    abandoned_time = tz.now() - timedelta(hours=1)
+    abandoned = make_tick(in_game_time=abandoned_time, active=False)
+
+    # Resume: Phase 1 A, Phase 1 B, Phase 2 A, Phase 2 B (4 calls)
+    # New tick: same again (4 calls)
+    side_effects = two_phase_responses(2) + two_phase_responses(2)
+    with patch("simulation.pipeline.call_llm", side_effect=side_effects):
+        new_tick = run_tick()
+
+    abandoned.refresh_from_db()
+    assert abandoned.active is True
+    assert AgentTick.objects.filter(tick=abandoned).count() == 2
+
+    expected = abandoned_time + timedelta(minutes=settings.TICK_INTERVAL_MINUTES)
+    assert abs((new_tick.in_game_time - expected).total_seconds()) < 1
+
+
+@pytest.mark.django_db
+def test_run_tick_catchup_resumes_abandoned_tick(settings):
+    """Catchup mode resumes an abandoned tick before jumping to ceil(now, interval)."""
+    make_location()
+    make_agent()
+    abandoned = make_tick(in_game_time=tz.now() - timedelta(hours=2), active=False)
+
+    # Resume: 2 calls; new tick: 2 calls
+    with patch(
+        "simulation.pipeline.call_llm",
+        side_effect=two_phase_responses(1) + two_phase_responses(1),
+    ):
+        new_tick = run_tick(catchup=True)
+
+    abandoned.refresh_from_db()
+    assert abandoned.active is True
+    expected = _ceil_to_interval(tz.now(), settings.TICK_INTERVAL_MINUTES)
+    assert abs((new_tick.in_game_time - expected).total_seconds()) < 2
 
 
 # --- daily plan tests ---
