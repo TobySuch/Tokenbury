@@ -25,8 +25,8 @@ repos:
       - id: prettier
         name: prettier
         language: system
-        entry: bash -c 'cd frontend && bun run format'
-        files: \.(md|json|js|jsx|ts|tsx)$
+        entry: bash -c 'cd frontend && bun run format:check'
+        files: \.(md|json|js|jsx|ts|tsx|html)$
         pass_filenames: false
 
       - id: pytest
