@@ -1,5 +1,19 @@
 from rest_framework import serializers
-from world.models import Agent, AgentTick, DailyPlan, Location, Tick
+from world.models import Agent, AgentTick, DailyPlan, Instance, Location, Tick
+
+
+class InstanceSerializer(serializers.ModelSerializer):
+    map_image_url = serializers.SerializerMethodField()
+
+    def get_map_image_url(self, obj):
+        request = self.context.get("request")
+        if obj.map_image and request:
+            return request.build_absolute_uri(obj.map_image.url)
+        return obj.map_image.url if obj.map_image else None
+
+    class Meta:
+        model = Instance
+        fields = ["id", "name", "slug", "map_image_url"]
 
 
 class LocationSerializer(serializers.ModelSerializer):

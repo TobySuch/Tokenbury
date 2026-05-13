@@ -3,6 +3,7 @@ import TownView from './components/town/TownView'
 import AgentPanel from './components/agents/AgentPanel'
 import TimelineScrubber from './components/timeline/TimelineScrubber'
 import {
+  fetchInstance,
   fetchLocations,
   fetchLatestTick,
   fetchTicks,
@@ -15,6 +16,7 @@ function tickToDay(inGameTime) {
 }
 
 function App() {
+  const [instance, setInstance] = useState(null)
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [locations, setLocations] = useState([])
   const [days, setDays] = useState([])
@@ -45,8 +47,9 @@ function App() {
   }, [isLive])
 
   useEffect(() => {
-    Promise.all([fetchLocations(), fetchTickDays(), fetchLatestTick()]).then(
-      ([locs, daysData, latest]) => {
+    Promise.all([fetchInstance(), fetchLocations(), fetchTickDays(), fetchLatestTick()]).then(
+      ([inst, locs, daysData, latest]) => {
+        setInstance(inst)
         setLocations(locs)
         setDays(daysData)
         if (latest) {
@@ -241,6 +244,7 @@ function App() {
             </div>
             <div className="max-lg:landscape:flex-1 max-lg:landscape:min-w-0">
               <TownView
+                instance={instance}
                 locations={locations}
                 tickData={tickData}
                 onAgentChange={setSelectedAgent}

@@ -2,7 +2,21 @@ import { render, screen, act } from '@testing-library/react'
 import App from './App'
 
 beforeEach(() => {
-  globalThis.fetch = vi.fn(() => Promise.resolve({ json: () => Promise.resolve([]) }))
+  globalThis.fetch = vi.fn((url) => {
+    if (url === '/api/instance/') {
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            id: 1,
+            name: 'Test',
+            slug: 'test',
+            map_image_url: '/media/maps/test.png',
+          }),
+      })
+    }
+    return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+  })
 })
 
 afterEach(() => {

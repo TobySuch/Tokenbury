@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.utils import timezone as tz
 
-from world.models import Agent, AgentTick, DailyPlan, Location, Tick
+from world.models import Agent, AgentTick, DailyPlan, Instance, Location, Tick
 
 from simulation.llm import LLMError, call_llm
 from simulation.pipeline import TickContext, _extract_json, _normalise
@@ -16,8 +16,23 @@ from simulation.runner import _round_to_interval, run_tick
 # --- factories ---
 
 
-def make_agent(name="Margaret", active=True):
+def make_instance():
+    inst, _ = Instance.objects.get_or_create(
+        slug="test-instance",
+        defaults={
+            "name": "Test Instance",
+            "map_image": "maps/test.png",
+            "active": True,
+        },
+    )
+    return inst
+
+
+def make_agent(name="Margaret", active=True, instance=None):
+    if instance is None:
+        instance = make_instance()
     return Agent.objects.create(
+        instance=instance,
         name=name,
         bio=f"{name} is a retired teacher who loves the sea.",
         sprite="sprites/margaret.png",
@@ -25,8 +40,11 @@ def make_agent(name="Margaret", active=True):
     )
 
 
-def make_location(slug="harbour_cafe", name="Harbour Café"):
+def make_location(slug="harbour_cafe", name="Harbour Café", instance=None):
+    if instance is None:
+        instance = make_instance()
     return Location.objects.create(
+        instance=instance,
         slug=slug,
         name=name,
         description="A cosy café overlooking the harbour.",
@@ -37,10 +55,14 @@ def make_location(slug="harbour_cafe", name="Harbour Café"):
     )
 
 
-def make_tick(in_game_time=None, active=False):
+def make_tick(in_game_time=None, active=False, instance=None):
     if in_game_time is None:
         in_game_time = tz.now()
-    return Tick.objects.create(in_game_time=in_game_time, active=active)
+    if instance is None:
+        instance = make_instance()
+    return Tick.objects.create(
+        in_game_time=in_game_time, active=active, instance=instance
+    )
 
 
 def make_agent_tick(
@@ -474,7 +496,7 @@ def test_run_tick_skips_inactive_agents(_mock):
 def test_run_tick_advances_in_game_time(_mock, settings):
     make_location()
     base_time = tz.now()
-    Tick.objects.create(in_game_time=base_time)
+    make_tick(in_game_time=base_time)
     tick = run_tick()
     expected = base_time + timedelta(minutes=settings.TICK_INTERVAL_MINUTES)
     assert abs((tick.in_game_time - expected).total_seconds()) < 1
@@ -592,7 +614,7 @@ def test_plan_generated_on_first_morning_tick(_mock, settings):
     make_location()
     agent = make_agent()
     morning_time = tz.now().replace(hour=7, minute=0, second=0, microsecond=0)
-    Tick.objects.create(in_game_time=morning_time - timedelta(minutes=15))
+    make_tick(in_game_time=morning_time - timedelta(minutes=15))
     run_tick()
     plan = DailyPlan.objects.filter(agent=agent).first()
     assert plan is not None
@@ -611,7 +633,7 @@ def test_plan_not_generated_before_plan_hour(_mock, settings):
     make_location()
     make_agent()
     early_time = tz.now().replace(hour=5, minute=15, second=0, microsecond=0)
-    Tick.objects.create(in_game_time=early_time)
+    make_tick(in_game_time=early_time)
     run_tick()
     assert DailyPlan.objects.count() == 0
 
@@ -623,14 +645,14 @@ def test_plan_not_regenerated_when_one_exists(_mock, settings):
     make_location()
     agent = make_agent()
     morning_time = tz.now().replace(hour=7, minute=0, second=0, microsecond=0)
-    prior_tick = Tick.objects.create(in_game_time=morning_time, active=True)
+    prior_tick = make_tick(in_game_time=morning_time, active=True)
     DailyPlan.objects.create(
         agent=agent,
         date=morning_time.date(),
         plan=["Existing plan item"],
         generated_at_tick=prior_tick,
     )
-    Tick.objects.create(in_game_time=morning_time + timedelta(minutes=15))
+    make_tick(in_game_time=morning_time + timedelta(minutes=15))
     run_tick()
     assert DailyPlan.objects.filter(agent=agent).count() == 1
 
@@ -650,7 +672,7 @@ def test_plan_gracefully_skipped_on_invalid_llm_output(mock_llm, settings):
         "daily_plan": "not a list",
     })
     morning_time = tz.now().replace(hour=7, minute=0, second=0, microsecond=0)
-    Tick.objects.create(in_game_time=morning_time)
+    make_tick(in_game_time=morning_time)
     run_tick()
     assert DailyPlan.objects.count() == 0
 
@@ -696,7 +718,7 @@ def test_round_to_interval_clears_subseconds():
 def test_run_tick_catchup_jumps_to_rounded_now(_mock, settings):
     make_location()
     old_time = tz.now() - timedelta(hours=5)
-    Tick.objects.create(in_game_time=old_time, active=True)
+    make_tick(in_game_time=old_time, active=True)
     tick = run_tick(catchup=True)
     half_interval = timedelta(minutes=settings.TICK_INTERVAL_MINUTES / 2)
     assert abs(tick.in_game_time - tz.now()) <= half_interval
@@ -707,7 +729,7 @@ def test_run_tick_catchup_jumps_to_rounded_now(_mock, settings):
 def test_run_tick_catchup_falls_back_when_already_caught_up(_mock, settings):
     make_location()
     future_time = tz.now() + timedelta(hours=1)
-    Tick.objects.create(in_game_time=future_time, active=True)
+    make_tick(in_game_time=future_time, active=True)
     tick = run_tick(catchup=True)
     expected = future_time + timedelta(minutes=settings.TICK_INTERVAL_MINUTES)
     assert tick.in_game_time == expected
@@ -718,7 +740,7 @@ def test_run_tick_catchup_falls_back_when_already_caught_up(_mock, settings):
 def test_run_tick_catchup_falls_back_when_rounded_equals_last_tick(_mock, settings):
     make_location()
     rounded_now = _round_to_interval(tz.now(), settings.TICK_INTERVAL_MINUTES)
-    Tick.objects.create(in_game_time=rounded_now, active=True)
+    make_tick(in_game_time=rounded_now, active=True)
     tick = run_tick(catchup=True)
     expected = rounded_now + timedelta(minutes=settings.TICK_INTERVAL_MINUTES)
     assert tick.in_game_time == expected

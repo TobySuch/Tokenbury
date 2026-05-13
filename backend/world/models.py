@@ -1,7 +1,23 @@
 from django.db import models
 
 
+class Instance(models.Model):
+    name = models.CharField(max_length=200)
+    slug = models.SlugField(unique=True)
+    map_image = models.ImageField(upload_to="maps/")
+    created_at = models.DateTimeField(auto_now_add=True)
+    active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Agent(models.Model):
+    instance = models.ForeignKey(
+        Instance,
+        on_delete=models.CASCADE,
+        related_name="agents",
+    )
     name = models.CharField(max_length=200)
     bio = models.TextField()
     sprite = models.ImageField(upload_to="sprites/")
@@ -12,7 +28,12 @@ class Agent(models.Model):
 
 
 class Location(models.Model):
-    slug = models.SlugField(unique=True)
+    instance = models.ForeignKey(
+        Instance,
+        on_delete=models.CASCADE,
+        related_name="locations",
+    )
+    slug = models.SlugField()
     name = models.CharField(max_length=200)
     description = models.TextField()
     bbox_x1 = models.FloatField()
@@ -20,11 +41,19 @@ class Location(models.Model):
     bbox_x2 = models.FloatField()
     bbox_y2 = models.FloatField()
 
+    class Meta:
+        unique_together = [("instance", "slug")]
+
     def __str__(self):
         return self.name
 
 
 class Tick(models.Model):
+    instance = models.ForeignKey(
+        Instance,
+        on_delete=models.CASCADE,
+        related_name="ticks",
+    )
     in_game_time = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
     active = models.BooleanField(default=False)

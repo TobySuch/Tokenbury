@@ -77,6 +77,23 @@ test('renders the map image', () => {
   expect(screen.getByRole('img', { name: /tokenbury/i })).toBeInTheDocument()
 })
 
+test('uses map_image_url from instance prop when provided', () => {
+  const instance = { name: 'Test', slug: 'test', map_image_url: '/media/maps/custom.png' }
+  render(<TownView instance={instance} />)
+  expect(screen.getByRole('img', { name: /tokenbury.*map/i })).toHaveAttribute(
+    'src',
+    '/media/maps/custom.png'
+  )
+})
+
+test('falls back to static map when instance is not provided', () => {
+  render(<TownView />)
+  expect(screen.getByRole('img', { name: /tokenbury.*map/i })).toHaveAttribute(
+    'src',
+    '/assets/map/town.png'
+  )
+})
+
 test('renders a bounding box for each location after image loads in debug mode', () => {
   setDebugMode(true)
   renderAndLoad()

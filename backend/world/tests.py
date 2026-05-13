@@ -1,5 +1,13 @@
 import pytest
-from world.models import Agent, AgentTick, DailyPlan, Location, Tick
+from world.models import Agent, AgentTick, DailyPlan, Instance, Location, Tick
+
+
+def make_instance(name="Test Instance", slug="test-instance", active=True):
+    inst, _ = Instance.objects.get_or_create(
+        slug=slug,
+        defaults={"name": name, "map_image": "maps/test.png", "active": active},
+    )
+    return inst
 
 
 @pytest.mark.django_db
@@ -20,6 +28,7 @@ def test_locations_empty(client):
 @pytest.mark.django_db
 def test_locations_returns_location(client):
     Location.objects.create(
+        instance=make_instance(),
         slug="harbour_cafe",
         name="Harbour Café",
         description="A cosy café overlooking the harbour.",
@@ -51,8 +60,11 @@ def test_location_str():
 # --- helpers ---
 
 
-def make_agent(name="Margaret"):
+def make_agent(name="Margaret", instance=None):
+    if instance is None:
+        instance = make_instance()
     return Agent.objects.create(
+        instance=instance,
         name=name,
         bio="A retired teacher.",
         sprite="sprites/margaret.png",
@@ -60,8 +72,11 @@ def make_agent(name="Margaret"):
     )
 
 
-def make_location():
+def make_location(instance=None):
+    if instance is None:
+        instance = make_instance()
     return Location.objects.create(
+        instance=instance,
         slug="harbour_cafe",
         name="Harbour Café",
         description="A cosy café.",
@@ -72,8 +87,12 @@ def make_location():
     )
 
 
-def make_tick(in_game_time="2024-01-01T09:00:00Z", active=False):
-    return Tick.objects.create(in_game_time=in_game_time, active=active)
+def make_tick(in_game_time="2024-01-01T09:00:00Z", active=False, instance=None):
+    if instance is None:
+        instance = make_instance()
+    return Tick.objects.create(
+        in_game_time=in_game_time, active=active, instance=instance
+    )
 
 
 # --- Tick model ---
@@ -326,3 +345,57 @@ def test_agent_detail_no_plan_for_today_returns_none(client):
     response = client.get(f"/api/agents/{agent.pk}/")
     assert response.status_code == 200
     assert response.json()["todays_plan"] is None
+
+
+# --- /api/instance/ ---
+
+
+@pytest.mark.django_db
+def test_instance_endpoint_404_when_no_instance(client):
+    response = client.get("/api/instance/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_instance_endpoint_404_when_no_active_instance(client):
+    Instance.objects.create(
+        name="Inactive", slug="inactive", map_image="maps/test.png", active=False
+    )
+    response = client.get("/api/instance/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_instance_endpoint_returns_active_instance(client):
+    make_instance(name="Tokenbury-on-Sea", slug="tokenbury-on-sea")
+    response = client.get("/api/instance/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Tokenbury-on-Sea"
+    assert data["slug"] == "tokenbury-on-sea"
+    assert "map_image_url" in data
+
+
+@pytest.mark.django_db
+def test_locations_filtered_by_active_instance(client):
+    active_inst = make_instance()
+    inactive_inst = Instance.objects.create(
+        name="Other Instance",
+        slug="other-instance",
+        map_image="maps/test.png",
+        active=False,
+    )
+    make_location(instance=active_inst)
+    Location.objects.create(
+        instance=inactive_inst,
+        slug="harbour_cafe",
+        name="Other Café",
+        description="Not visible.",
+        bbox_x1=0.0,
+        bbox_y1=0.0,
+        bbox_x2=100.0,
+        bbox_y2=100.0,
+    )
+    response = client.get("/api/locations/")
+    assert response.status_code == 200
+    assert len(response.json()) == 1

@@ -1,7 +1,25 @@
-import { fetchLatestTick, fetchTicks, fetchTickDays, fetchTickById } from './client'
+import { fetchInstance, fetchLatestTick, fetchTicks, fetchTickDays, fetchTickById } from './client'
 
 afterEach(() => {
   vi.restoreAllMocks()
+})
+
+test('fetchInstance calls /api/instance/ and returns parsed data', async () => {
+  const data = {
+    id: 1,
+    name: 'Tokenbury-on-Sea',
+    slug: 'tokenbury-on-sea',
+    map_image_url: '/media/maps/town.png',
+  }
+  globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve(data) }))
+  const result = await fetchInstance()
+  expect(fetch).toHaveBeenCalledWith('/api/instance/')
+  expect(result).toEqual(data)
+})
+
+test('fetchInstance returns null on non-ok response', async () => {
+  globalThis.fetch = vi.fn(() => Promise.resolve({ ok: false }))
+  expect(await fetchInstance()).toBeNull()
 })
 
 test('fetchLatestTick with no arg calls /api/ticks/latest/', async () => {

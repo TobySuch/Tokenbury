@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.urls import path
 from django.views.static import serve
 from world.views import (
+    active_instance,
     agent_detail,
     health,
     locations,
@@ -15,6 +16,7 @@ from world.views import (
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/health/", health),
+    path("api/instance/", active_instance),
     path("api/agents/<int:pk>/", agent_detail),
     path("api/locations/", locations),
     path("api/ticks/", tick_list),

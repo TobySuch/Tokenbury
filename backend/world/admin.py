@@ -1,6 +1,13 @@
 from django.contrib import admin
 
-from world.models import Agent, AgentTick, DailyPlan, Location, Tick
+from world.models import Agent, AgentTick, DailyPlan, Instance, Location, Tick
+
+
+@admin.register(Instance)
+class InstanceAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "active", "created_at")
+    list_filter = ("active",)
+    prepopulated_fields = {"slug": ("name",)}
 
 
 @admin.register(Agent)

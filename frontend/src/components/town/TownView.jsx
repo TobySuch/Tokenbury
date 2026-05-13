@@ -48,7 +48,13 @@ const BORDER_COLOURS = [
   'rgb(202,138,4)',
 ]
 
-export default function TownView({ locations = [], tickData, onAgentChange, className = '' }) {
+export default function TownView({
+  instance,
+  locations = [],
+  tickData,
+  onAgentChange,
+  className = '',
+}) {
   const isDebug = new URLSearchParams(window.location.search).get('debug') === '1'
   const [naturalSize, setNaturalSize] = useState(null)
   const [hoverCoords, setHoverCoords] = useState(null)
@@ -158,7 +164,7 @@ export default function TownView({ locations = [], tickData, onAgentChange, clas
       <TickClock inGameTime={tickData?.in_game_time} />
       <img
         ref={imgRef}
-        src="/assets/map/town.png"
+        src={instance?.map_image_url ?? '/assets/map/town.png'}
         alt="Tokenbury-on-Sea map"
         className="block w-full"
         onLoad={handleImageLoad}

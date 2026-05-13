@@ -2,18 +2,31 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
-from world.models import Agent, Location, Tick
+from world.models import Agent, Instance, Location, Tick
 from world.serializers import (
     AgentDetailSerializer,
+    InstanceSerializer,
     LocationSerializer,
     TickDetailSerializer,
     TickListSerializer,
 )
 
 
+def _active_instance():
+    return Instance.objects.filter(active=True).first()
+
+
 @api_view(["GET"])
 def health(request):
     return Response({"status": "ok", "message": "Tokenbury is alive 🌊"})
+
+
+@api_view(["GET"])
+def active_instance(request):
+    instance = _active_instance()
+    if instance is None:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    return Response(InstanceSerializer(instance, context={"request": request}).data)
 
 
 @api_view(["GET"])
@@ -27,12 +40,19 @@ def agent_detail(request, pk):
 
 @api_view(["GET"])
 def locations(request):
-    return Response(LocationSerializer(Location.objects.all(), many=True).data)
+    instance = _active_instance()
+    qs = (
+        Location.objects.filter(instance=instance)
+        if instance
+        else Location.objects.none()
+    )
+    return Response(LocationSerializer(qs, many=True).data)
 
 
 @api_view(["GET"])
 def tick_list(request):
-    qs = Tick.objects.all()
+    instance = _active_instance()
+    qs = Tick.objects.filter(instance=instance) if instance else Tick.objects.none()
     date_str = request.query_params.get("date")
     if date_str:
         qs = qs.filter(in_game_time__date=date_str)
@@ -41,7 +61,9 @@ def tick_list(request):
 
 @api_view(["GET"])
 def tick_days(request):
-    dates = Tick.objects.dates("in_game_time", "day", order="ASC")
+    instance = _active_instance()
+    qs = Tick.objects.filter(instance=instance) if instance else Tick.objects.none()
+    dates = qs.dates("in_game_time", "day", order="ASC")
     return Response([d.isoformat() for d in dates])
 
 
@@ -58,7 +80,11 @@ def tick_detail(request, pk):
 
 @api_view(["GET"])
 def tick_latest(request):
-    latest = Tick.objects.filter(active=True).only("id").first()
+    instance = _active_instance()
+    qs = Tick.objects.filter(active=True)
+    if instance:
+        qs = qs.filter(instance=instance)
+    latest = qs.only("id").first()
     if latest is None:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
