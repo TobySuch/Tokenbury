@@ -16,6 +16,12 @@ CORS_ALLOWED_ORIGINS = [
     if o.strip()
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    o.strip()
+    for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if o.strip()
+]
+
 STATIC_ROOT = BASE_DIR / "staticfiles"  # noqa: F405
 
 db_option = os.environ.get("DATABASE", "sqlite").lower()
