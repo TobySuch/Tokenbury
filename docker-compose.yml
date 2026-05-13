@@ -16,6 +16,16 @@ services:
       - db
     restart: unless-stopped
 
+  ticker:
+    image: ghcr.io/tobysuch/tokenbury:latest
+    env_file: .env
+    command: ./ticker_entrypoint.sh
+    depends_on:
+      - db
+    restart: unless-stopped
+    profiles:
+      - ticker
+
   caddy:
     image: caddy:alpine
     ports:

@@ -14,7 +14,7 @@ RUN uv sync --frozen --no-dev
 COPY backend/ .
 COPY --from=frontend-builder /app/dist /app/frontend_dist
 
-RUN chmod +x entrypoint.sh
+RUN chmod +x entrypoint.sh ticker_entrypoint.sh
 
 EXPOSE 8000
 ENTRYPOINT ["./entrypoint.sh"]

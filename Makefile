@@ -1,4 +1,4 @@
-.PHONY: dev backend frontend prod prod-down install migrate makemigrations shell createsuperuser lint format test ticker
+.PHONY: dev backend frontend prod prod-down prod-ticker install migrate makemigrations shell createsuperuser lint format test ticker
 
 # ─── Dev Servers ─────────────────────────────────────────────────────────────
 
@@ -15,6 +15,9 @@ frontend:
 
 prod:
 	docker compose up --build -d
+
+prod-ticker:
+	docker compose --profile ticker up --build -d
 
 prod-down:
 	docker compose down
