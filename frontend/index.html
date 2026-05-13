@@ -14,7 +14,8 @@
       href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap"
       rel="stylesheet"
     />
-    {{ $domain := env "PLAUSIBLE_DOMAIN" }}{{ $url := env "PLAUSIBLE_URL" }}{{ if and $domain $url }}
+    {{ $domain := env "PLAUSIBLE_DOMAIN" }}{{ $url := env "PLAUSIBLE_URL" }}{{ if and $domain $url
+    }}
     <script defer data-domain="{{ $domain }}" src="{{ $url }}/js/script.js"></script>
     {{ end }}
   </head>
