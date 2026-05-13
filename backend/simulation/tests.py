@@ -10,7 +10,7 @@ from world.models import Agent, AgentTick, DailyPlan, Instance, Location, Tick
 from simulation.llm import LLMError, call_llm
 from simulation.pipeline import TickContext, _extract_json, _normalise
 from simulation.prompts import build_activity_prompt, build_location_prompt
-from simulation.runner import _round_to_interval, run_tick
+from simulation.runner import SimulationAlreadyUpToDate, _round_to_interval, run_tick
 
 
 # --- factories ---
@@ -725,22 +725,22 @@ def test_run_tick_catchup_jumps_to_rounded_now(_mock, settings):
 
 
 @pytest.mark.django_db
-@patch("simulation.pipeline.call_llm", side_effect=two_phase_responses(1))
-def test_run_tick_catchup_falls_back_when_already_caught_up(_mock, settings):
+def test_run_tick_catchup_noop_when_sim_is_ahead(settings):
     make_location()
     future_time = tz.now() + timedelta(hours=1)
-    make_tick(in_game_time=future_time, active=True)
-    tick = run_tick(catchup=True)
-    expected = future_time + timedelta(minutes=settings.TICK_INTERVAL_MINUTES)
-    assert tick.in_game_time == expected
+    existing_tick = make_tick(in_game_time=future_time, active=True)
+    with pytest.raises(SimulationAlreadyUpToDate) as exc_info:
+        run_tick(catchup=True)
+    assert exc_info.value.tick.id == existing_tick.id
+    assert Tick.objects.count() == 1
 
 
 @pytest.mark.django_db
-@patch("simulation.pipeline.call_llm", side_effect=two_phase_responses(1))
-def test_run_tick_catchup_falls_back_when_rounded_equals_last_tick(_mock, settings):
+def test_run_tick_catchup_noop_when_rounded_equals_last_tick(settings):
     make_location()
     rounded_now = _round_to_interval(tz.now(), settings.TICK_INTERVAL_MINUTES)
-    make_tick(in_game_time=rounded_now, active=True)
-    tick = run_tick(catchup=True)
-    expected = rounded_now + timedelta(minutes=settings.TICK_INTERVAL_MINUTES)
-    assert tick.in_game_time == expected
+    existing_tick = make_tick(in_game_time=rounded_now, active=True)
+    with pytest.raises(SimulationAlreadyUpToDate) as exc_info:
+        run_tick(catchup=True)
+    assert exc_info.value.tick.id == existing_tick.id
+    assert Tick.objects.count() == 1

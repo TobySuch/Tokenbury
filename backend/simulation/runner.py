@@ -16,6 +16,12 @@ from .pipeline import (
 logger = logging.getLogger(__name__)
 
 
+class SimulationAlreadyUpToDate(Exception):
+    def __init__(self, tick: Tick) -> None:
+        self.tick = tick
+        super().__init__(f"Already up to date at {tick.in_game_time.isoformat()}")
+
+
 def _round_to_interval(dt: datetime, interval_minutes: int) -> datetime:
     total_seconds = interval_minutes * 60
     epoch = dt.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -41,7 +47,7 @@ def run_tick(catchup: bool = False) -> Tick:
         if rounded > previous_tick.in_game_time:
             in_game_time = rounded
         else:
-            in_game_time = previous_tick.in_game_time + timedelta(minutes=interval)
+            raise SimulationAlreadyUpToDate(previous_tick)
     else:
         in_game_time = previous_tick.in_game_time + timedelta(minutes=interval)
 

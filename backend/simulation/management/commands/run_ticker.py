@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from simulation.runner import run_tick
+from simulation.runner import SimulationAlreadyUpToDate, run_tick
 from world.models import AgentTick
 
 
@@ -18,7 +18,15 @@ class Command(BaseCommand):
         catchup = options["catchup"]
         if catchup:
             self.stdout.write("Catchup mode: jumping to current real-world time.")
-        tick = run_tick(catchup=catchup)
+        try:
+            tick = run_tick(catchup=catchup)
+        except SimulationAlreadyUpToDate as e:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Already up to date — most recent tick is {e.tick.in_game_time.isoformat()}, no new tick created."
+                )
+            )
+            return
         count = AgentTick.objects.filter(tick=tick).count()
         self.stdout.write(
             self.style.SUCCESS(
