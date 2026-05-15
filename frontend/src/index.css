@@ -9,7 +9,7 @@ body {
    Landscape small screens: scrubber is hidden and header is shorter, so use a
    smaller offset so the map fills most of the viewport height. */
 :root {
-  --map-height-offset: 20rem;
+  --map-height-offset: 17rem;
 }
 @media (max-width: 1023px) and (orientation: landscape) {
   :root {
