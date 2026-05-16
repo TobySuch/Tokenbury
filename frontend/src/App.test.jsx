@@ -1,4 +1,5 @@
 import { render, screen, act } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import App from './App'
 
 beforeEach(() => {
@@ -25,14 +26,22 @@ afterEach(() => {
 
 test('App renders the page heading', async () => {
   await act(async () => {
-    render(<App />)
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    )
   })
   expect(screen.getAllByRole('img', { name: 'Tokenbury-on-Sea' }).length).toBeGreaterThan(0)
 })
 
 test('App renders the town map image', async () => {
   await act(async () => {
-    render(<App />)
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    )
   })
   expect(screen.getByRole('img', { name: /tokenbury.*map/i })).toBeInTheDocument()
 })

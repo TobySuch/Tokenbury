@@ -2,8 +2,17 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
+const stripHugoTemplates = {
+  name: 'strip-hugo-templates',
+  enforce: 'pre',
+  transformIndexHtml: {
+    order: 'pre',
+    handler: (html) => html.replace(/\{\{[\s\S]*?\}\}/g, ''),
+  },
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), stripHugoTemplates],
   server: {
     proxy: {
       '/api': {
