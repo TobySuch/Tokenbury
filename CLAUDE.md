@@ -325,6 +325,8 @@ These are planned but not part of the initial build:
 # Git Workflow
 
 - `main` branch is always deployable, contains production-ready code.
+- **Never push directly to `main`.** All changes must go through a pull request, no exceptions.
 - Use conventional commits for clear history and changelog generation. Scope should not be included.
 - Use pre-commit hooks for testing, linting and formatting (e.g. `ruff`, `eslint`, `prettier`).
 - Tests should always pass before commiting. There is no such thing as "pre-existing issue" - if you find an issue with the tests, fix it and commit.
+- **Never use `git -C`.** The working directory is always the project root; use absolute paths or rely on the shell's current directory instead.
