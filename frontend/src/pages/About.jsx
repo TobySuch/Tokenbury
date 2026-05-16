@@ -41,6 +41,30 @@ function About() {
           .
         </p>
       </div>
+      <footer className="mx-auto mt-12 max-w-2xl border-t border-[#d4bc8a] py-6 text-sm text-[#7a6248]">
+        <p>
+          Created by{' '}
+          <a href="https://www.tobysuch.uk" target="_blank" className="hover:underline">
+            Toby Such
+          </a>{' '}
+          · © 2026 Toby Such · Code available under the{' '}
+          <a
+            href="https://github.com/TobySuch/Tokenbury/blob/main/LICENSE"
+            target="_blank"
+            className="hover:underline"
+          >
+            GNU GPL v3
+          </a>{' '}
+          ·{' '}
+          <a
+            href="https://github.com/TobySuch/Tokenbury"
+            target="_blank"
+            className="hover:underline"
+          >
+            GitHub
+          </a>
+        </p>
+      </footer>
     </main>
   )
 }
