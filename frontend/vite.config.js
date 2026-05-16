@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 const stripHugoTemplates = {
   name: 'strip-hugo-templates',
+  apply: 'serve',
   enforce: 'pre',
   transformIndexHtml: {
     order: 'pre',
