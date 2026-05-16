@@ -10,7 +10,7 @@ dependencies = [
     "djangorestframework>=3.17.1",
     "pillow>=12.2.0",
     "psycopg[binary]>=3.0",
-    "python-dotenv>=1.0",
+    "python-dotenv>=1.2.2",
     "uvicorn[standard]>=0.47.0",
     "whitenoise>=6.0",
 ]
