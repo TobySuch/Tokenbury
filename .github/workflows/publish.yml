@@ -39,3 +39,21 @@ jobs:
             ghcr.io/tobysuch/tokenbury:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to server
+    needs: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH and redeploy
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script: |
+            cd ${{ secrets.DEPLOY_COMPOSE_DIR }}
+            docker compose pull
+            docker compose up -d
