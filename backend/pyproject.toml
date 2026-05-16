@@ -11,7 +11,7 @@ dependencies = [
     "pillow>=12.2.0",
     "psycopg[binary]>=3.0",
     "python-dotenv>=1.0",
-    "uvicorn[standard]>=0.34",
+    "uvicorn[standard]>=0.47.0",
     "whitenoise>=6.0",
 ]
 
