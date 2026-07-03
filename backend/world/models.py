@@ -12,6 +12,18 @@ class Instance(models.Model):
         return self.name
 
 
+class Banner(models.Model):
+    text = models.TextField()
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.text[:50]
+
+
 class Agent(models.Model):
     instance = models.ForeignKey(
         Instance,

@@ -1,7 +1,7 @@
 import pytest
 from django.utils import timezone as tz
 from datetime import timedelta
-from world.models import Agent, AgentTick, DailyPlan, Instance, Location, Tick
+from world.models import Agent, AgentTick, Banner, DailyPlan, Instance, Location, Tick
 
 
 def make_instance(name="Test Instance", slug="test-instance", active=True):
@@ -376,6 +376,59 @@ def test_instance_endpoint_returns_active_instance(client):
     assert data["name"] == "Tokenbury-on-Sea"
     assert data["slug"] == "tokenbury-on-sea"
     assert "map_image_url" in data
+
+
+# --- /api/banner/ ---
+
+
+@pytest.mark.django_db
+def test_banner_endpoint_404_when_no_banners(client):
+    response = client.get("/api/banner/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_banner_endpoint_404_when_only_inactive_banners(client):
+    Banner.objects.create(text="Old announcement", active=False)
+    response = client.get("/api/banner/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_banner_endpoint_returns_active_banner(client):
+    Banner.objects.create(text="The simulation is paused.", active=True)
+    response = client.get("/api/banner/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["text"] == "The simulation is paused."
+    assert "id" in data
+    assert "created_at" in data
+
+
+@pytest.mark.django_db
+def test_banner_endpoint_returns_most_recently_created_active_banner(client):
+    Banner.objects.create(text="Older banner", active=True)
+    newest = Banner.objects.create(text="Newest banner", active=True)
+    response = client.get("/api/banner/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == newest.pk
+    assert data["text"] == "Newest banner"
+
+
+@pytest.mark.django_db
+def test_banner_endpoint_ignores_inactive_when_newer_than_active(client):
+    active = Banner.objects.create(text="Active but older", active=True)
+    Banner.objects.create(text="Newer but inactive", active=False)
+    response = client.get("/api/banner/")
+    assert response.status_code == 200
+    assert response.json()["id"] == active.pk
+
+
+@pytest.mark.django_db
+def test_banner_str_truncates_to_50_chars():
+    banner = Banner(text="A" * 100)
+    assert str(banner) == "A" * 50
 
 
 # --- API_HIDE_FUTURE_TICKS ---
