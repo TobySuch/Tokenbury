@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from world.models import Agent, AgentTick, DailyPlan, Instance, Location, Tick
+from world.models import Agent, AgentTick, Banner, DailyPlan, Instance, Location, Tick
+
+
+@admin.register(Banner)
+class BannerAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "active", "created_at")
+    list_editable = ("active",)
+    list_filter = ("active",)
+    ordering = ("-created_at",)
 
 
 @admin.register(Instance)

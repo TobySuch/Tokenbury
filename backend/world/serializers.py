@@ -1,5 +1,11 @@
 from rest_framework import serializers
-from world.models import Agent, AgentTick, DailyPlan, Instance, Location, Tick
+from world.models import Agent, AgentTick, Banner, DailyPlan, Instance, Location, Tick
+
+
+class BannerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Banner
+        fields = ["id", "text", "created_at"]
 
 
 class InstanceSerializer(serializers.ModelSerializer):

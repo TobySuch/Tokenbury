@@ -1,12 +1,14 @@
 import { Routes, Route, NavLink } from 'react-router-dom'
 import Home from './pages/Home'
 import About from './pages/About'
+import Banner from './components/Banner'
 import BottomNav from './components/BottomNav'
 import Footer from './components/Footer'
 
 function App() {
   return (
     <div className="flex min-h-screen flex-col bg-[#faf5e4] pb-12 text-[#3d2b1f] lg:pb-0">
+      <Banner />
       <header className="hidden lg:flex shrink-0 items-center border-b border-[#d4bc8a] p-1">
         <h1>
           <NavLink to="/">

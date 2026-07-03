@@ -4,9 +4,10 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
-from world.models import Agent, Instance, Location, Tick
+from world.models import Agent, Banner, Instance, Location, Tick
 from world.serializers import (
     AgentDetailSerializer,
+    BannerSerializer,
     InstanceSerializer,
     LocationSerializer,
     TickDetailSerializer,
@@ -35,6 +36,14 @@ def active_instance(request):
     if instance is None:
         return Response(status=status.HTTP_404_NOT_FOUND)
     return Response(InstanceSerializer(instance, context={"request": request}).data)
+
+
+@api_view(["GET"])
+def active_banner(request):
+    banner = Banner.objects.filter(active=True).first()
+    if banner is None:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    return Response(BannerSerializer(banner).data)
 
 
 @api_view(["GET"])

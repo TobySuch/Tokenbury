@@ -16,6 +16,9 @@ beforeEach(() => {
           }),
       })
     }
+    if (url === '/api/banner/') {
+      return Promise.resolve({ ok: false })
+    }
     return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
   })
 })

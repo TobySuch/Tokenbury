@@ -1,5 +1,7 @@
 export const fetchInstance = () => fetch('/api/instance/').then((r) => (r.ok ? r.json() : null))
 
+export const fetchBanner = () => fetch('/api/banner/').then((r) => (r.ok ? r.json() : null))
+
 export const fetchLocations = () => fetch('/api/locations/').then((r) => r.json())
 
 export const fetchAgentDetail = (agentId) =>
