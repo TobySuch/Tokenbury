@@ -1,6 +1,7 @@
 import { Routes, Route, NavLink } from 'react-router-dom'
 import Home from './pages/Home'
 import About from './pages/About'
+import WerewolfPage from './werewolf/WerewolfPage'
 import Banner from './components/Banner'
 import BottomNav from './components/BottomNav'
 import Footer from './components/Footer'
@@ -15,7 +16,17 @@ function App() {
             <img src="/assets/logo.png" alt="Tokenbury-on-Sea" className="h-28 w-auto" />
           </NavLink>
         </h1>
-        <nav className="ml-auto pr-4">
+        <nav className="ml-auto flex gap-2 pr-4">
+          <NavLink
+            to="/werewolf"
+            className={({ isActive }) =>
+              `rounded-lg border border-[#d4bc8a] px-4 py-2 font-semibold transition-colors hover:bg-[#f0e6c8] ${
+                isActive ? 'bg-[#f0e6c8]' : 'bg-[#faf5e4]'
+              }`
+            }
+          >
+            Werewolf
+          </NavLink>
           <NavLink
             to="/about"
             className={({ isActive }) =>
@@ -31,6 +42,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<About />} />
+        <Route path="/werewolf" element={<WerewolfPage />} />
+        <Route path="/werewolf/:gameId" element={<WerewolfPage />} />
       </Routes>
       <Footer />
       <BottomNav />
