@@ -17,15 +17,26 @@ class LLMError(Exception):
 
 
 def call_llm(prompt: str) -> str:
+    body = post_chat({
+        "model": settings.LLM_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "response_format": {"type": "json_object"},
+    })
+    return body["choices"][0]["message"]["content"]
+
+
+def post_chat(payload: dict, timeout: float | None = None) -> dict:
+    """POST a chat-completions payload to OpenRouter and return the parsed body.
+
+    Retryable HTTP statuses / error bodies are retried with backoff. A socket
+    timeout or connection failure is not retried: it raises LLMError at once,
+    so the caller's own retry policy (and time budget) stays in control.
+    """
     api_key = settings.OPENROUTER_API_KEY
     if not api_key:
         raise LLMError("OPENROUTER_API_KEY is not set")
 
-    payload = json.dumps({
-        "model": settings.LLM_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "response_format": {"type": "json_object"},
-    }).encode()
+    payload = json.dumps(payload).encode()
 
     req = urllib.request.Request(
         "https://openrouter.ai/api/v1/chat/completions",
@@ -49,7 +60,7 @@ def call_llm(prompt: str) -> str:
 
     for attempt in range(MAX_RETRIES + 1):
         try:
-            with urllib.request.urlopen(req) as resp:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
                 resp_headers = dict(resp.headers)
                 raw = resp.read()
                 body = json.loads(raw)
@@ -79,7 +90,7 @@ def call_llm(prompt: str) -> str:
                     time.sleep(delay)
                     continue
                 raise LLMError(f"OpenRouter error: {err}")
-            return body["choices"][0]["message"]["content"]
+            return body
         except urllib.error.HTTPError as exc:
             err_body = exc.read().decode(errors="replace")
             logger.warning(
@@ -107,5 +118,7 @@ def call_llm(prompt: str) -> str:
                 MAX_RETRIES,
             )
             time.sleep(delay)
+        except (TimeoutError, urllib.error.URLError) as exc:
+            raise LLMError(f"OpenRouter request failed: {exc}") from exc
 
     raise LLMError("Exhausted retries")

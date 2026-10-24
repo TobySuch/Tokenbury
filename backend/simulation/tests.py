@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.utils import timezone as tz
 
-from simulation.llm import LLMError, call_llm
+from simulation.llm import LLMError, call_llm, post_chat
 from simulation.pipeline import TickContext, _extract_json, _normalise
 from simulation.prompts import build_activity_prompt, build_location_prompt
 from simulation.runner import (
@@ -460,6 +460,55 @@ def test_call_llm_raises_on_missing_api_key(mock_settings):
 
     with pytest.raises(LLMError, match="OPENROUTER_API_KEY"):
         call_llm("Hello")
+
+
+@patch("simulation.llm.settings")
+@patch("simulation.llm.urllib.request.urlopen")
+def test_post_chat_returns_full_body_and_passes_timeout(mock_urlopen, mock_settings):
+    mock_settings.OPENROUTER_API_KEY = "test-key"
+    body = {"choices": [{"message": {"content": "hi"}}], "usage": {"prompt_tokens": 3}}
+    mock_urlopen.return_value = _make_urlopen_mock(body)
+
+    result = post_chat({"model": "m", "messages": []}, timeout=12)
+
+    assert result == body
+    assert mock_urlopen.call_args.kwargs["timeout"] == 12
+    assert json.loads(mock_urlopen.call_args[0][0].data) == {
+        "model": "m",
+        "messages": [],
+    }
+
+
+@patch("simulation.llm.time.sleep")
+@patch("simulation.llm.settings")
+@patch("simulation.llm.urllib.request.urlopen")
+def test_post_chat_retries_retryable_http_errors(mock_urlopen, mock_settings, _sleep):
+    import urllib.error
+
+    mock_settings.OPENROUTER_API_KEY = "test-key"
+    err = urllib.error.HTTPError(
+        url=None, code=503, msg="Unavailable", hdrs=None, fp=None
+    )
+    err.read = lambda: b"{}"
+    err.headers = {}
+    ok = _make_urlopen_mock({"choices": []})
+    mock_urlopen.side_effect = [err, ok]
+
+    assert post_chat({"messages": []}) == {"choices": []}
+    assert mock_urlopen.call_count == 2
+
+
+@patch("simulation.llm.settings")
+@patch("simulation.llm.urllib.request.urlopen")
+def test_post_chat_socket_timeout_raises_llm_error_without_retry(
+    mock_urlopen, mock_settings
+):
+    mock_settings.OPENROUTER_API_KEY = "test-key"
+    mock_urlopen.side_effect = TimeoutError("timed out")
+
+    with pytest.raises(LLMError, match="timed out"):
+        post_chat({"messages": []}, timeout=1)
+    assert mock_urlopen.call_count == 1
 
 
 # --- runner tests ---
