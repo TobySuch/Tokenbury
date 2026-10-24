@@ -17,7 +17,7 @@ NIGHT_PHASES = {
 
 BANNERS = {
     Phase.NIGHT_WOLF_CHAT: "Night {day}",
-    Phase.NIGHT_DOCTOR: "Night {day}: The doctor does their rounds",
+    Phase.NIGHT_DOCTOR: "Night {day}: The doctor's rounds",
     Phase.NIGHT_LOVERS: "Night {day}: The lovers whisper",
     Phase.NIGHT_SEER: "Night {day}: The seer listens",
     Phase.MORNING: "Day {day}: Morning",
@@ -25,6 +25,13 @@ BANNERS = {
     Phase.VOTE: "Day {day}: Vote",
     Phase.ELIMINATION: "Day {day}: Elimination",
     Phase.DAY_NOTES: "Day {day}: Notes",
+}
+
+
+DEATH_BEATS = {
+    "night_kill": ("morning", "{name} was killed in the night."),
+    "vote": ("elimination", "{name} was eliminated."),
+    "heartbreak": ("heartbreak", "{name} died of a broken heart."),
 }
 
 
@@ -55,6 +62,7 @@ def build_beats(game) -> list[dict]:
             "palette": _palette(state["phase"]),
             "banner": _banner(state["phase"], state["day"]),
             "actor_id": None,
+            "target_id": None,
             "text": None,
             "kill_target_id": None,
             "victim_id": None,
@@ -87,6 +95,31 @@ def build_beats(game) -> list[dict]:
                 text=p.get("message"),
                 kill_target_id=p.get("kill_target_id"),
             )
+        elif e.type == "protect":
+            target = players.get(p.get("target_id"))
+            add(
+                e.seq,
+                "protect",
+                palette="night",
+                actor_id=e.actor_id,
+                target_id=p.get("target_id"),
+                text=f"The doctor protects {target.name if target else 'someone'}.",
+            )
+        elif e.type == "lover_message":
+            add(
+                e.seq,
+                "lover_message",
+                palette="night",
+                actor_id=e.actor_id,
+                text=p.get("message"),
+            )
+        elif e.type == "peaceful_night":
+            add(
+                e.seq,
+                "peaceful_night",
+                palette="day",
+                text="Nobody died last night.",
+            )
         elif e.type == "speech":
             add(e.seq, "speech", actor_id=e.actor_id, text=p.get("message"))
         elif e.type == "death":
@@ -95,17 +128,14 @@ def build_beats(game) -> list[dict]:
                 continue
             if victim.id in alive:
                 alive.remove(victim.id)
-            night = p["cause"] == "night_kill"
+            kind, text = DEATH_BEATS.get(p["cause"], DEATH_BEATS["vote"])
             add(
                 e.seq,
-                "morning" if night else "elimination",
+                kind,
+                palette="day" if kind == "heartbreak" else _palette(state["phase"]),
                 victim_id=victim.id,
                 role=victim.role,
-                text=(
-                    f"{victim.name} was killed in the night."
-                    if night
-                    else f"{victim.name} was eliminated."
-                ),
+                text=text.format(name=victim.name),
             )
         elif e.type == "vote_result":
             eliminated = players.get(p.get("eliminated_id"))

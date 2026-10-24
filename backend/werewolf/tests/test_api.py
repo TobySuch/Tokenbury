@@ -2,6 +2,7 @@ import pytest
 from rest_framework.test import APIClient
 
 from werewolf.models import Game, PlayerNotes
+from werewolf.setup import create_game
 from werewolf.tests.factories import create_classic_game, make_characters
 
 pytestmark = pytest.mark.django_db
@@ -52,7 +53,9 @@ def test_players(client, game):
         "role",
         "wolf_label",
         "alive",
+        "lover_id",
     }
+    assert all(d["lover_id"] is None for d in data)
     assert data[0]["avatar_url"] == "http://testserver/media/werewolf/avatars/a.png"
     assert data[1]["avatar_url"] is None or data[1]["avatar_url"].startswith("http")
     assert data[0]["role"] == p.role
@@ -101,3 +104,14 @@ def test_unpublished_games_are_hidden(client, game):
     for path in ["", "players/", "beats/", f"notes/?player={player.id}&at=1"]:
         resp = client.get(f"/api/werewolf/games/{hidden.id}/{path}")
         assert resp.status_code == 404, path
+
+
+def test_players_lover_id_symmetric(client):
+    make_characters(9)
+    game = create_game(seed=4, config={"player_count": 9}, published=True)
+    data = client.get(f"/api/werewolf/games/{game.id}/players/").json()
+    by_id = {d["id"]: d for d in data}
+    paired = [d for d in data if d["lover_id"] is not None]
+    assert len(paired) == 2
+    for d in paired:
+        assert by_id[d["lover_id"]]["lover_id"] == d["id"]

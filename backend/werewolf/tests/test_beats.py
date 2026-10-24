@@ -6,6 +6,7 @@ from werewolf.beats import build_beats
 from werewolf.engine import ScriptedProvider, run_day
 from werewolf.events import append_event
 from werewolf.models import ENGINE, PUBLIC, WOLF_CHAT, Game, GameEvent
+from werewolf.setup import create_game
 from werewolf.tests.factories import create_classic_game, make_characters
 
 pytestmark = pytest.mark.django_db
@@ -13,7 +14,7 @@ pytestmark = pytest.mark.django_db
 KEYS = {
     "index", "seq", "day", "phase", "kind", "palette", "banner", "actor_id",
     "text", "kill_target_id", "victim_id", "role", "votes", "tally", "winner",
-    "alive_ids",
+    "alive_ids", "target_id",
 }  # fmt: skip
 
 
@@ -171,3 +172,127 @@ def test_scripted_full_game():
         )
         assert want == {b["seq"] for b in beats if b["kind"] == kind}
     assert beats[-1]["winner"] == game.winner
+
+
+def test_new_kinds_hand_built():
+    game = new_game()
+    doctor, other, wolf = list(game.players.order_by("seat")[:3])
+    ND, NL = "night_doctor", "night_lovers"
+    ev(
+        game,
+        "phase_change",
+        ENGINE,
+        1,
+        "night_wolf_chat",
+        **{"from": "night_wolf_chat", "to": ND},
+    )
+    ev(game, "protect", f"player:{doctor.id}", 1, ND, doctor, target_id=other.id)
+    ev(game, "save_result", f"player:{doctor.id}", 1, ND, saved=True)
+    ev(game, "phase_change", ENGINE, 1, ND, **{"from": ND, "to": NL})
+    ev(game, "lover_message", "lovers", 1, NL, doctor, message="darling")
+    ev(game, "phase_change", ENGINE, 1, NL, **{"from": NL, "to": "morning"})
+    ev(game, "peaceful_night", PUBLIC, 1, "morning")
+    ev(
+        game,
+        "death",
+        PUBLIC,
+        2,
+        "morning",
+        player_id=other.id,
+        cause="night_kill",
+        role=None,
+    )
+    ev(
+        game,
+        "death",
+        PUBLIC,
+        2,
+        "morning",
+        player_id=wolf.id,
+        cause="heartbreak",
+        role=None,
+    )
+    ev(
+        game,
+        "death",
+        PUBLIC,
+        3,
+        "elimination",
+        player_id=doctor.id,
+        cause="vote",
+        role=None,
+    )
+    ev(game, "death", PUBLIC, 3, "elimination", player_id=game.players.order_by("seat")[3].id, cause="heartbreak", role=None)  # fmt: skip
+
+    beats = build_beats(game)
+    assert all(set(b) == KEYS for b in beats)
+    assert [b["kind"] for b in beats] == [
+        "phase_change", "phase_change", "protect", "phase_change", "lover_message",
+        "phase_change", "peaceful_night", "morning", "heartbreak", "elimination",
+        "heartbreak",
+    ]  # fmt: skip
+    assert beats[1]["banner"] == "Night 1: The doctor's rounds"
+    assert beats[3]["banner"] == "Night 1: The lovers whisper"
+    assert beats[3]["palette"] == "night"
+    pr = beats[2]
+    assert (pr["palette"], pr["actor_id"], pr["target_id"]) == (
+        "night",
+        doctor.id,
+        other.id,
+    )
+    assert pr["text"] == f"The doctor protects {other.name}."
+    lm = beats[4]
+    assert (lm["palette"], lm["actor_id"], lm["text"]) == (
+        "night",
+        doctor.id,
+        "darling",
+    )
+    pn = beats[6]
+    assert (pn["palette"], pn["text"]) == ("day", "Nobody died last night.")
+    hb = beats[8]
+    assert (
+        hb["palette"] == "day"
+        and hb["victim_id"] == wolf.id
+        and hb["role"] == wolf.role
+    )
+    assert hb["text"] == f"{wolf.name} died of a broken heart."
+    assert other.id not in hb["alive_ids"] and wolf.id not in hb["alive_ids"]
+    assert beats[7]["target_id"] is None
+    assert doctor.id not in beats[10]["alive_ids"]
+    assert len(beats[10]["alive_ids"]) == len(beats[9]["alive_ids"]) - 1
+
+
+def test_scripted_full_default_game():
+    make_characters(9)
+    game = create_game(seed=5, config={"player_count": 9})
+    provider = ScriptedProvider(game)
+    for _ in range(20):
+        run_day(game, provider)
+        game.refresh_from_db()
+        if game.status != Game.Status.ACTIVE:
+            break
+    assert game.status == Game.Status.FINISHED
+    beats = build_beats(game)
+    assert all(set(b) == KEYS for b in beats)
+    assert [b["index"] for b in beats] == list(range(len(beats)))
+    assert not [b for b in beats if b["kind"] == "save_result"]
+    for etype in ("lover_message", "protect", "peaceful_night"):
+        want = set(
+            GameEvent.objects.filter(game=game, type=etype).values_list(
+                "seq", flat=True
+            )
+        )
+        assert want == {b["seq"] for b in beats if b["kind"] == etype}
+    hb = set(
+        GameEvent.objects.filter(
+            game=game, type="death", payload__cause="heartbreak"
+        ).values_list("seq", flat=True)
+    )
+    assert hb == {b["seq"] for b in beats if b["kind"] == "heartbreak"}
+    assert all(b["target_id"] for b in beats if b["kind"] == "protect")
+    for prev, cur in itertools.pairwise(beats):
+        shrunk = set(prev["alive_ids"]) - set(cur["alive_ids"])
+        if cur["kind"] in ("morning", "elimination", "heartbreak"):
+            assert shrunk == {cur["victim_id"]}
+        else:
+            assert not shrunk
