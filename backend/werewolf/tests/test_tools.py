@@ -29,7 +29,7 @@ def names(kind):
 
 
 def test_constants():
-    assert TERMINAL_TOOLS == {"speak", "pass", "vote"}
+    assert TERMINAL_TOOLS == {"speak", "pass", "vote", "protect"}
     assert NOTE_TOOLS == {"append_note", "replace_notes"}
 
 
@@ -41,6 +41,8 @@ def test_constants():
         ("discussion", {"speak", "pass", "append_note", "replace_notes"}),
         ("vote", {"vote", "append_note", "replace_notes"}),
         ("day_notes", {"pass", "append_note", "replace_notes"}),
+        ("doctor", {"protect", "pass", "append_note", "replace_notes"}),
+        ("lovers_chat", {"speak", "pass", "append_note", "replace_notes"}),
     ],
 )
 def test_tools_for(kind, expected):
@@ -55,6 +57,7 @@ def speak_props(kind):
 def test_kill_target_only_in_wolf_chat_schema():
     assert "kill_target" in speak_props("wolf_chat")
     assert "kill_target" not in speak_props("discussion")
+    assert "kill_target" not in speak_props("lovers_chat")
 
 
 def test_replace_notes_warns():
@@ -151,3 +154,86 @@ def test_speak_schema_states_the_character_cap():
     ]
     desc = speak["function"]["parameters"]["properties"]["message"]["description"]
     assert "250 characters" in desc
+
+
+def doctor(**kw):
+    return ctx(turn_kind="doctor", actor_role="doctor", actor_name="Dee", **kw)
+
+
+def test_protect_valid_including_self_and_case():
+    d = doctor(living_names=["Alice", "Bob", "Dee"])
+    assert validate_tool_call("protect", {"target": "bob"}, d) is None
+    assert validate_tool_call("protect", {"target": "Dee"}, d) is None
+    assert validate_tool_call("pass", {}, d) is None
+
+
+def test_protect_outside_doctor_turn_rejected():
+    assert validate_tool_call("protect", {"target": "Bob"}, ctx())
+    assert validate_tool_call("protect", {"target": "Bob"}, ctx(turn_kind="vote"))
+
+
+def test_protect_only_for_the_doctor_role():
+    c = ctx(turn_kind="doctor", actor_role="villager")
+    err = validate_tool_call("protect", {"target": "Bob"}, c)
+    assert err
+    assert "doctor" in err.lower()
+
+
+@pytest.mark.parametrize("target", ["Nobody", "", None, 5])
+def test_protect_unknown_target(target):
+    assert validate_tool_call("protect", {"target": target}, doctor())
+
+
+def test_protect_dead_target_rejected():
+    d = doctor(living_names=["Alice", "Dee"])
+    assert validate_tool_call("protect", {"target": "Bob"}, d)
+
+
+def test_protect_same_as_last_night_rejected():
+    d = doctor(last_protected="Bob")
+    err = validate_tool_call("protect", {"target": " BOB "}, d)
+    assert err
+    assert "Bob" in err
+    assert validate_tool_call("protect", {"target": "Alice"}, d) is None
+
+
+def test_speak_not_allowed_in_doctor_turn():
+    assert validate_tool_call("speak", {"message": "hi"}, doctor())
+
+
+def test_lovers_chat_speak_only_for_lovers():
+    base = {"turn_kind": "lovers_chat", "actor_name": "Alice"}
+    assert (
+        validate_tool_call("speak", {"message": "hi"}, ctx(actor_is_lover=True, **base))
+        is None
+    )
+    err = validate_tool_call("speak", {"message": "hi"}, ctx(**base))
+    assert err
+    assert "lover" in err.lower()
+
+
+def test_seer_who_is_a_lover_may_speak_in_lovers_chat():
+    c = ctx(turn_kind="lovers_chat", actor_role="seer", actor_is_lover=True)
+    assert validate_tool_call("speak", {"message": "hi"}, c) is None
+    assert validate_tool_call(
+        "speak",
+        {"message": "hi"},
+        ctx(turn_kind="seer_notes", actor_role="seer", actor_is_lover=True),
+    )
+
+
+def test_wolf_name_guard_not_applied_in_lovers_chat():
+    c = ctx(
+        turn_kind="lovers_chat",
+        actor_role="wolf",
+        actor_is_lover=True,
+        actor_name="Wanda",
+    )
+    assert (
+        validate_tool_call("speak", {"message": "Wilf and Wanda scare me"}, c) is None
+    )
+
+
+def test_lovers_chat_message_length_still_checked():
+    c = ctx(turn_kind="lovers_chat", actor_is_lover=True)
+    assert validate_tool_call("speak", {"message": "x" * 401}, c)

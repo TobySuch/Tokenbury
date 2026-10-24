@@ -3,8 +3,16 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
 from werewolf.events import append_event
-from werewolf.models import ENGINE, PUBLIC, WOLF_CHAT, Player, player_visibility
+from werewolf.models import (
+    ENGINE,
+    LOVERS,
+    PUBLIC,
+    WOLF_CHAT,
+    Player,
+    player_visibility,
+)
 from werewolf.notes import append_note
+from werewolf.setup import create_game
 from werewolf.tests.factories import create_classic_game, make_characters
 from werewolf.visibility import (
     VisibleEvent,
@@ -330,3 +338,134 @@ def test_dead_player_cutoff_holds_when_day_filter_excludes_death(game):
     v1.refresh_from_db()
     assert events_visible_to(v1, day=2) == []
     assert len(events_visible_to(v2, day=2)) == 1
+
+
+@pytest.fixture
+def rich():
+    """Default game: doctor and lovers on."""
+    make_characters(12)
+    return create_game(seed=3)
+
+
+def test_lovers_channel_visible_only_to_the_two_lovers(rich):
+    lovers = [p for p in rich.players.all() if p.lover_id]
+    assert len(lovers) == 2
+    a, b = lovers
+    append_event(
+        rich,
+        type="lover_message",
+        visibility=LOVERS,
+        actor=a,
+        payload={"message": "CANARY_LOVE"},
+    )
+    for p in rich.players.all():
+        seen = "CANARY_LOVE" in repr(events_visible_to(p))
+        assert seen == (p.id in (a.id, b.id)), p.role
+    msg = next(e for e in events_visible_to(b) if e.type == "lover_message")
+    assert msg.speaker == a.name
+
+
+def test_non_lover_wolf_seer_doctor_never_see_lover_message(rich):
+    lovers = [p for p in rich.players.all() if p.lover_id]
+    append_event(
+        rich,
+        type="lover_message",
+        visibility=LOVERS,
+        actor=lovers[0],
+        payload={"message": "CANARY_LOVE"},
+    )
+    others = [p for p in rich.players.all() if not p.lover_id]
+    assert {"wolf", "seer", "doctor"} <= {p.role for p in rich.players.all()}
+    for p in others:
+        assert "lover_message" not in seq_types(events_visible_to(p))
+
+
+def test_protect_and_save_result_visible_only_to_the_doctor(rich):
+    d = rich.players.get(role="doctor")
+    target = rich.players.exclude(pk=d.pk).first()
+    append_event(
+        rich,
+        type="protect",
+        visibility=player_visibility(d.id),
+        actor=d,
+        payload={"target_id": target.id},
+    )
+    append_event(
+        rich,
+        type="save_result",
+        visibility=player_visibility(d.id),
+        payload={"saved": True},
+    )
+    for p in rich.players.all():
+        t = seq_types(events_visible_to(p))
+        assert ("protect" in t) == (p.id == d.id)
+        assert ("save_result" in t) == (p.id == d.id)
+    events = {e.type: e for e in events_visible_to(d)}
+    assert events["protect"].payload == {"target": target.name}
+    assert events["save_result"].payload == {"saved": True}
+
+
+def test_heartbreak_death_and_peaceful_night_are_public(rich):
+    a = next(p for p in rich.players.all() if p.lover_id)
+    append_event(
+        rich,
+        type="death",
+        visibility=PUBLIC,
+        payload={"player_id": a.id, "cause": "heartbreak", "role": a.role},
+    )
+    append_event(rich, type="peaceful_night", visibility=PUBLIC, payload={})
+    viewer = next(p for p in rich.players.all() if p.id != a.id)
+    t = seq_types(events_visible_to(viewer))
+    assert "peaceful_night" in t
+    death = next(e for e in events_visible_to(viewer) if e.type == "death")
+    assert death.payload["player"] == a.name
+    assert death.payload["cause"] == "heartbreak"
+
+
+def test_lover_role_assigned_has_partner_name_but_no_partner_role(rich):
+    for p in rich.players.select_related("lover__character"):
+        info = own_role_info(p)
+        if p.lover_id:
+            assert info["lover_name"] == p.lover.name
+            assert info["lovers_note"]
+            assert p.lover.role not in repr({
+                k: v for k, v in info.items() if k not in ("role", "win_condition")
+            }).replace(p.lover.name, "")
+        else:
+            assert "lover_name" not in info
+
+
+def test_dead_lover_cutoff_still_applies(rich):
+    a, b = [p for p in rich.players.all() if p.lover_id]
+    append_event(
+        rich,
+        type="lover_message",
+        visibility=LOVERS,
+        actor=b,
+        payload={"message": "before"},
+    )
+    append_event(
+        rich,
+        type="death",
+        visibility=PUBLIC,
+        payload={"player_id": a.id, "cause": "vote", "role": a.role},
+    )
+    append_event(
+        rich,
+        type="lover_message",
+        visibility=LOVERS,
+        actor=b,
+        payload={"message": "after"},
+    )
+    Player.objects.filter(pk=a.pk).update(alive=False)
+    a.refresh_from_db()
+    text = repr(events_visible_to(a))
+    assert "before" in text
+    assert "after" not in text
+
+
+def test_query_count_with_lovers(rich):
+    p = next(p for p in rich.players.all() if p.lover_id)
+    with CaptureQueriesContext(connection) as ctx:
+        events_visible_to(p)
+    assert len(ctx) <= 2

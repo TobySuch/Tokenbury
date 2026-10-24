@@ -369,6 +369,8 @@ def test_moderator_view_has_no_secrets(game):
         "VOTE_CANARY": None,
         "ENGINE_CANARY": None,
         "PRIVATE_CANARY": None,
+        "LOVERS_CANARY": None,
+        "PROTECT_CANARY": None,
     }
     wolf = next(p for p in ps if p.role == "wolf")
     append_event(
@@ -400,6 +402,22 @@ def test_moderator_view_has_no_secrets(game):
         visibility=ENGINE,
         payload={"from": "a", "to": "ENGINE_CANARY"},
     )
+    from werewolf.models import LOVERS
+
+    append_event(
+        game,
+        type="lover_message",
+        visibility=LOVERS,
+        actor=wolf,
+        payload={"message": "LOVERS_CANARY"},
+    )
+    append_event(
+        game,
+        type="protect",
+        visibility=f"player:{ps[1].id}",
+        actor=ps[1],
+        payload={"target_id": ps[2].id, "x": "PROTECT_CANARY"},
+    )
     from werewolf.models import PlayerNotes
 
     PlayerNotes.objects.create(
@@ -414,7 +432,7 @@ def test_moderator_view_has_no_secrets(game):
     for canary in canaries:
         assert canary not in text
     lowered = text.lower()
-    for word in ["wolf", "seer", "villager", "werewolf"]:
+    for word in ["wolf", "seer", "villager", "werewolf", "doctor", "lover"]:
         assert word not in lowered
     assert "public line one" in text
     assert "my reason" in text

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from werewolf.config import game_config
 from werewolf.models import (
+    LOVERS,
     PUBLIC,
     WOLF_CHAT,
     GameEvent,
@@ -70,6 +71,8 @@ def events_visible_to(player, day=None) -> list[VisibleEvent]:
     visibilities = [PUBLIC, player_visibility(player.id)]
     if player.role in (Player.Role.WOLF, Player.Role.SEER):
         visibilities.append(WOLF_CHAT)
+    if player.lover_id:
+        visibilities.append(LOVERS)
     qs = GameEvent.objects.filter(
         game_id=player.game_id, visibility__in=visibilities
     ).order_by("seq")
