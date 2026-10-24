@@ -30,25 +30,25 @@ function App() {
             <h1>
               <NavLink to="/werewolf" end>
                 <img
-                  src="/assets/werewolf-logo.png"
+                  src="/assets/werewolf-logo.webp"
                   alt="Tokenbury Werewolf"
                   className="h-28 w-auto"
                 />
               </NavLink>
             </h1>
-            <SiteLink to="/" label="Back to:" logo="/assets/logo.png" alt="Tokenbury-on-Sea" />
+            <SiteLink to="/" label="Back to:" logo="/assets/logo.webp" alt="Tokenbury-on-Sea" />
           </>
         ) : (
           <>
             <h1>
               <NavLink to="/">
-                <img src="/assets/logo.png" alt="Tokenbury-on-Sea" className="h-28 w-auto" />
+                <img src="/assets/logo.webp" alt="Tokenbury-on-Sea" className="h-28 w-auto" />
               </NavLink>
             </h1>
             <SiteLink
               to="/werewolf"
               label="Try:"
-              logo="/assets/werewolf-logo.png"
+              logo="/assets/werewolf-logo.webp"
               alt="Tokenbury Werewolf"
             />
           </>

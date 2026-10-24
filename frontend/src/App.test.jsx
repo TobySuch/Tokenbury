@@ -74,7 +74,7 @@ test('on the town site the werewolf logo sits next to the main logo with a Try: 
   const tryLink = within(header).getByRole('link', { name: /try.*werewolf/i })
   expect(tryLink).toHaveAttribute('href', '/werewolf')
   expect(tryLink).toHaveTextContent('Try:')
-  expect(within(tryLink).getByRole('img')).toHaveAttribute('src', '/assets/werewolf-logo.png')
+  expect(within(tryLink).getByRole('img')).toHaveAttribute('src', '/assets/werewolf-logo.webp')
   expect(within(header).getByRole('heading', { level: 1 })).toContainElement(
     within(header).getByRole('img', { name: 'Tokenbury-on-Sea' })
   )
@@ -93,8 +93,22 @@ test('on the werewolf site the header uses the werewolf logo', async () => {
   const header = screen.getByRole('banner')
   const heading = within(header).getByRole('heading', { level: 1 })
   const logo = within(heading).getByRole('img', { name: 'Tokenbury Werewolf' })
-  expect(logo).toHaveAttribute('src', '/assets/werewolf-logo.png')
+  expect(logo).toHaveAttribute('src', '/assets/werewolf-logo.webp')
   expect(within(heading).getByRole('link')).toHaveAttribute('href', '/werewolf')
   const back = within(header).getByRole('link', { name: /back to.*tokenbury-on-sea/i })
   expect(back).toHaveAttribute('href', '/')
+})
+
+test('header logos use the lightweight webp versions', async () => {
+  await act(async () => {
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    )
+  })
+  const header = screen.getByRole('banner')
+  within(header)
+    .getAllByRole('img')
+    .forEach((img) => expect(img.getAttribute('src')).toMatch(/\.webp$/))
 })
