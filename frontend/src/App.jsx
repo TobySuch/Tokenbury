@@ -24,7 +24,7 @@ function App() {
   const onWerewolf = useLocation().pathname.startsWith('/werewolf')
   return (
     <div className="flex min-h-screen flex-col bg-[#faf5e4] pb-12 text-[#3d2b1f] lg:pb-0">
-      <Banner />
+      <Banner site={onWerewolf ? 'werewolf' : 'town'} />
       <header className="hidden lg:flex shrink-0 items-center border-b border-[#d4bc8a] p-1">
         {onWerewolf ? (
           <>

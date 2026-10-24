@@ -5,9 +5,9 @@ from world.models import Agent, AgentTick, Banner, DailyPlan, Instance, Location
 
 @admin.register(Banner)
 class BannerAdmin(admin.ModelAdmin):
-    list_display = ("__str__", "active", "created_at")
+    list_display = ("__str__", "site", "active", "created_at")
     list_editable = ("active",)
-    list_filter = ("active",)
+    list_filter = ("active", "site")
     ordering = ("-created_at",)
 
 

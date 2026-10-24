@@ -29,3 +29,30 @@ test('renders nothing when there is no active banner', async () => {
   await act(async () => {})
   expect(container).toBeEmptyDOMElement()
 })
+
+test('asks for the banner of the given site', async () => {
+  globalThis.fetch = vi.fn(() => Promise.resolve({ ok: false }))
+  await act(async () => {
+    render(<Banner site="werewolf" />)
+  })
+  expect(globalThis.fetch).toHaveBeenCalledWith('/api/banner/?site=werewolf')
+})
+
+test('refetches when the site changes', async () => {
+  globalThis.fetch = vi.fn((url) =>
+    Promise.resolve({
+      ok: true,
+      json: () =>
+        Promise.resolve({ id: 1, text: url.endsWith('werewolf') ? 'Wolf news' : 'Town news' }),
+    })
+  )
+  let rerender
+  await act(async () => {
+    ;({ rerender } = render(<Banner site="town" />))
+  })
+  expect(screen.getByText('Town news')).toBeInTheDocument()
+  await act(async () => {
+    rerender(<Banner site="werewolf" />)
+  })
+  expect(screen.getByText('Wolf news')).toBeInTheDocument()
+})
