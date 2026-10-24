@@ -19,9 +19,8 @@ WIN_CONDITIONS = {
 }
 
 LOVERS_NOTE = (
-    "{name} is your secret lover. If either of you dies, the other dies "
-    "of a broken heart at once. If your partner turns out to be on the other "
-    "side, you can also win by being the last two left alive."
+    "If your partner turns out to be on the other side, you can also win by "
+    "being the last two left alive."
 )
 
 
@@ -98,7 +97,7 @@ def create_game(seed=None, config=None, published=False) -> Game:
         if player.lover:
             payload.update(
                 lover_name=player.lover.character.name,
-                lovers_note=LOVERS_NOTE.format(name=player.lover.character.name),
+                lovers_note=LOVERS_NOTE,
             )
         append_event(
             game,

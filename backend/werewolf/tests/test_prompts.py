@@ -484,7 +484,7 @@ def lover_view(role="villager", **kw):
     return view(
         role,
         lover_name="Bob",
-        lovers_note="Bob is your secret lover. WIN_NOTE",
+        lovers_note="WIN_NOTE",
         **kw,
     )
 
@@ -511,6 +511,21 @@ def test_lovers_section_only_for_lovers():
     nonlover = text(build(view("villager")))
     assert "secretly in love" not in nonlover
     assert "WIN_NOTE" not in nonlover
+
+
+def test_lovers_section_is_one_clean_paragraph():
+    t = text(build(lover_view()))
+    (line,) = [ln for ln in t.splitlines() if "secretly in love" in ln]
+    assert line.count("broken heart") == 1
+    assert "your secret lover" not in t
+    assert "WIN_NOTE" in line
+    order = [
+        "secretly in love with Bob",
+        "broken heart",
+        "Your partner's role is unknown to you.",
+        "WIN_NOTE",
+    ]
+    assert [line.index(x) for x in order] == sorted(line.index(x) for x in order)
 
 
 def test_lovers_section_never_names_a_role():

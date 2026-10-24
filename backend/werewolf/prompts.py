@@ -261,9 +261,8 @@ def _role_section(view: PlayerView, rules: PublicRules) -> str:
     elif view.role == "doctor":
         parts.append(DOCTOR_GUIDANCE)
     if view.lover_name:
-        parts.append(LOVERS_GUIDANCE.format(name=view.lover_name))
-        if view.lovers_note:
-            parts.append(view.lovers_note)
+        lovers = LOVERS_GUIDANCE.format(name=view.lover_name)
+        parts.append(f"{lovers} {view.lovers_note}" if view.lovers_note else lovers)
     return "\n".join(parts)
 
 
