@@ -328,6 +328,7 @@ Oct 24, 2026. Extends the MVP. Where this section and the earlier ones disagree,
 - **Knowledge.** Each lover's `role_assigned` payload names their partner, but not the partner's role. Nobody else is told, including the seer and the wolves.
 - **Lovers' chat.** A new `night_lovers` phase runs after the doctor's turn while both lovers are alive. They alternate for up to `lovers_chat_max_messages` turns (default 4, so 2 each), with `speak` or `pass`. Messages are `lover_message` events with a new visibility value, `lovers`, seen only by the two lovers (and spectators). No name guard and no anonymisation.
 - **Heartbreak.** When a lover dies by any cause, their partner immediately dies too: a public `death` with cause `heartbreak`, with the role revealed per `reveal_role_on_death`. The win check runs after the heartbreak death.
+- **Lover reveal.** When `reveal_role_on_death` is on, a dead lover's partner is revealed along with their role: the `death` payload carries `lover_id`, and logs read "Their lover was X". When it is off, neither the role nor the lover is revealed.
 - **Win.** A mixed couple is one wolf and one non-wolf. If the only two players left alive are a mixed couple, the winner is `lovers`. This check runs before the normal wolf and town checks. Otherwise a lover wins or loses with their own team. Lovers are told: "If your partner turns out to be on the other side, you can also win by being the last two left alive."
 - **Prompt.** Lovers get a section naming their partner, the heartbreak rule and the win condition above. The public rules say there may be a pair of secret lovers when `lovers` is on.
 
@@ -349,3 +350,18 @@ The seer still sees only `wolf_chat`. The leak canary, seer anonymity and visibi
 - New beats: `protect` (night, the doctor lit, target named), `lover_message` (bubble on the speaking lover, the two lovers lit, others dimmed), `peaceful_night` (morning banner: nobody died), and `heartbreak` (the partner fades out with a role badge).
 - A heart marker links the lovers' seats for spectators throughout. The Doctor gets its own role badge colour. A `lovers` winner shows "The lovers win".
 - The players endpoint adds `lover_id`.
+
+### Public facts and causes of death
+
+Added after the first live games, where players mistook a certain deduction (who the lovers were, after a heartbreak death) for a guess.
+
+- Every prompt's rules include a "How everything works (everyone knows this)" section, built from the game's setup. It covers:
+  - Deaths are announced with their cause.
+  - Roles, and lovers, are revealed on death when `reveal_role_on_death` is on.
+  - A death by broken heart proves who the lovers were.
+  - "Nobody died" means the doctor protected the wolves' target.
+  - The seer only sees labelled wolf chat.
+  - Nobody can investigate anyone.
+  - Who knows whose role.
+  - Which chats are private.
+- The roster shows each dead player's cause and day of death, which is always public. It also shows their role and lover when `reveal_role_on_death` is on. This means the facts survive into later days, after that day's log has gone.

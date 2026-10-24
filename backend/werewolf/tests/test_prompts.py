@@ -156,7 +156,7 @@ def test_roster_roles_only_for_dead_when_flag_on():
     roster = [RosterEntry("Bob", True, None), RosterEntry("Cara", False, "wolf")]
     on = text(build(roster=roster, reveal=True))
     assert "Bob (alive)" in on
-    assert "Cara (dead, was a wolf)" in on
+    assert "Cara (dead: was a wolf)" in on
     off = text(build(roster=[RosterEntry("Cara", False, None)], reveal=False))
     assert "Cara (dead)" in off
     assert "was a" not in off.split("## What you can see")[0].split("## Players")[1]
@@ -392,7 +392,8 @@ def test_dead_roster_flag_via_pipeline(game):
     dead = game.players.filter(role="villager")[1]
     Player.objects.filter(pk=dead.pk).update(alive=False)
     prompt = text(build_prompt_for(v, t_for("discussion")))
-    assert f"{dead.name} (dead, was a villager)" in prompt
+    # No death event was written here, so only the revealed role shows.
+    assert f"{dead.name} (dead: was a villager)" in prompt
     game.config = {**game.config, "reveal_role_on_death": False}
     game.save()
     v.refresh_from_db()
@@ -869,3 +870,89 @@ def test_roster_order_is_shuffled_per_player_but_stable(game):
     assert any(orders[pk] != seat_orders[pk] for pk in orders)
     # The first-listed name isn't the same seat for everyone.
     assert len({orders[p.pk][0] for p in players}) > 1
+
+
+# --- Public facts, causes of death and lover reveals ---
+
+
+def test_death_line_names_the_lover_when_revealed():
+    line = render_event(
+        ev(
+            "death",
+            {
+                "player": "Ann",
+                "cause": "night_kill",
+                "role": "villager",
+                "lover": "Bob",
+            },
+        )
+    )
+    assert (
+        line
+        == "Ann was killed in the night. They were a villager. Their lover was Bob."
+    )
+
+
+def test_death_line_without_lover_unchanged():
+    line = render_event(ev("death", {"player": "Ann", "cause": "vote", "role": "wolf"}))
+    assert line == "Ann was eliminated by vote. They were a wolf."
+
+
+@pytest.mark.parametrize(
+    "entry, expected",
+    [
+        (
+            RosterEntry(
+                "Ann", False, "villager", cause="night_kill", died_day=1, lover="Bob"
+            ),
+            "- Ann (dead: killed in the night on day 1; was a villager; Bob's lover)",
+        ),
+        (
+            RosterEntry(
+                "Bob", False, "seer", cause="heartbreak", died_day=1, lover="Ann"
+            ),
+            "- Bob (dead: died of a broken heart on day 1; was the seer; Ann's lover)",
+        ),
+        (
+            RosterEntry("Cy", False, None, cause="vote", died_day=2),
+            "- Cy (dead: eliminated by vote on day 2)",
+        ),
+        (RosterEntry("Di", True, None), "- Di (alive)"),
+    ],
+)
+def test_roster_lines_show_how_and_when_players_died(entry, expected):
+    roster_block = build(roster=[entry])[0]["content"].split("## Players\n", 1)[1]
+    assert roster_block.splitlines()[0] == expected
+
+
+def facts(r):
+    system = build(r=r)[0]["content"]
+    return system.split("## How everything works", 1)[1].split("General guidance", 1)[0]
+
+
+def test_facts_section_covers_deaths_roles_and_lovers():
+    f = facts(rules()).lower()
+    assert "every death is announced to everyone with its cause" in f
+    assert "their role is revealed" in f
+    assert "and so is their lover" in f
+    assert "died of a broken heart" in f and "certain" in f and "not a guess" in f
+    assert "nobody died" in f and "doctor protected" in f
+    assert "nobody can investigate or check" in f
+    assert "lovers know who their partner is" in f
+    assert "wolves know who the other wolves are" in f
+
+
+def test_facts_section_follows_the_game_setup():
+    hidden = facts(rules(reveal=False)).lower()
+    assert "roles are not revealed" in hidden
+    assert "their role is revealed" not in hidden
+    bare = facts(
+        rules(
+            counts={"wolf": 1, "seer": 0, "doctor": 0, "villager": 4},
+            player_count=5,
+            lovers=False,
+        )
+    ).lower()
+    assert "broken heart" not in bare
+    assert "doctor" not in bare
+    assert "seer" not in bare

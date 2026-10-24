@@ -50,7 +50,14 @@ def events_of(game, type=None, phase=None, day=None):
     return list(qs)
 
 
-ID_KEYS = {"target_id", "kill_target_id", "player_id", "eliminated_id", "voter_id"}
+ID_KEYS = {
+    "target_id",
+    "kill_target_id",
+    "player_id",
+    "eliminated_id",
+    "voter_id",
+    "lover_id",
+}
 
 
 def normalised_log(game):
