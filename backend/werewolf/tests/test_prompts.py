@@ -366,3 +366,14 @@ def test_dead_roster_flag_via_pipeline(game):
     v.refresh_from_db()
     prompt = text(build_prompt_for(v, t_for("discussion")))
     assert f"{dead.name} (dead)" in prompt
+
+
+@pytest.mark.parametrize("kind", ["discussion", "wolf_chat"])
+def test_speaking_turns_state_the_character_cap(kind):
+    msgs = build_player_prompt(view(), [], "", [], turn(kind), 3000, True, 250)
+    assert "at most 250 characters" in msgs[1]["content"]
+
+
+def test_vote_turn_has_no_speech_cap_line():
+    msgs = build_player_prompt(view(), [], "", [], turn("vote"), 3000, True, 250)
+    assert "at most 250 characters" not in msgs[1]["content"]

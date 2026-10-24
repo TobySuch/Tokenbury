@@ -204,6 +204,9 @@ def _roster_line(entry: RosterEntry, reveal: bool) -> str:
     return f"- {entry.name} (dead)"
 
 
+SPEAKING_KINDS = {"wolf_chat", "discussion"}
+
+
 def build_player_prompt(
     view: PlayerView,
     visible_events: list[VisibleEvent],
@@ -212,6 +215,7 @@ def build_player_prompt(
     turn: Turn,
     notes_cap: int,
     reveal_role_on_death: bool,
+    speech_max_chars: int = 400,
 ) -> list[dict]:
     persona = (
         f"## Who you are\nYou are {view.name}.\n{PERSONA_LINES[view.talkativeness]}"
@@ -232,6 +236,11 @@ def build_player_prompt(
         f"## Your turn\nDay {turn.day}, phase: {turn.phase}.\n"
         f"{INSTRUCTIONS[turn.kind]}\n"
         + (f"{turn.extra}\n" if turn.extra else "")
+        + (
+            f"Keep what you say to at most {speech_max_chars} characters.\n"
+            if turn.kind in SPEAKING_KINDS
+            else ""
+        )
         + f"Tools you may use: {', '.join(turn.allowed_tools)}.\n"
         "Update your notes before acting if there is anything worth keeping, "
         "then make exactly one action."
@@ -259,4 +268,5 @@ def build_prompt_for(player, turn: Turn) -> list[dict]:
         turn,
         cfg["notes_max_chars"],
         cfg["reveal_role_on_death"],
+        cfg["speech_max_chars"],
     )

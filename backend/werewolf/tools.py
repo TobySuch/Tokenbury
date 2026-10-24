@@ -22,8 +22,13 @@ def function_tool(name, description, properties=None, required=None):
     }
 
 
-def _speak(wolf_chat):
-    props = {"message": {"type": "string", "description": "What you say."}}
+def _speak(wolf_chat, speech_max_chars):
+    props = {
+        "message": {
+            "type": "string",
+            "description": f"What you say, at most {speech_max_chars} characters.",
+        }
+    }
     if wolf_chat:
         props["kill_target"] = {
             "type": "string",
@@ -66,11 +71,11 @@ _REPLACE = function_tool(
 )
 
 
-def tools_for(turn_kind: str) -> list[dict]:
+def tools_for(turn_kind: str, speech_max_chars: int = 400) -> list[dict]:
     terminal = {
-        "wolf_chat": [_speak(True), _PASS],
+        "wolf_chat": [_speak(True, speech_max_chars), _PASS],
         "seer_notes": [_PASS],
-        "discussion": [_speak(False), _PASS],
+        "discussion": [_speak(False, speech_max_chars), _PASS],
         "vote": [_VOTE],
         "day_notes": [_PASS],
     }[turn_kind]

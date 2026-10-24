@@ -133,7 +133,7 @@ def run_turn(
     """Run one turn. Writes notes and AgentCalls but never GameEvents."""
     if not ctx.actor_name:
         ctx = replace(ctx, actor_name=player.name)
-    tools = tools_for(turn.kind)
+    tools = tools_for(turn.kind, ctx.speech_max_chars)
     max_notes = game_config(game)["max_note_calls_per_turn"]
     messages = list(messages)
     note_calls = 0

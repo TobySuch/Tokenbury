@@ -58,15 +58,41 @@ def build_raw(content: str, tool_calls: list[ToolCall]) -> dict:
     return message
 
 
+def _with_cache_breakpoint(messages: list[dict], model: str) -> list[dict]:
+    """Mark the system prompt (rules, roster, today's log) as cacheable.
+
+    Anthropic models on OpenRouter only cache with an explicit cache_control
+    breakpoint; the system message is the stable, append-only prefix.
+    """
+    if not model.startswith("anthropic/"):
+        return messages
+    return [
+        {
+            **m,
+            "content": [
+                {
+                    "type": "text",
+                    "text": m["content"],
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
+        }
+        if m["role"] == "system" and isinstance(m["content"], str)
+        else m
+        for m in messages
+    ]
+
+
 class LLMAgent:
     def __init__(self, model: str | None = None, timeout: float | None = None):
         self.model = model
         self.timeout = timeout
 
     def respond(self, messages: list[dict], tools: list[dict]) -> AgentResponse:
+        model = self.model or settings.WEREWOLF_LLM_MODEL
         payload = {
-            "model": self.model or settings.WEREWOLF_LLM_MODEL,
-            "messages": messages,
+            "model": model,
+            "messages": _with_cache_breakpoint(messages, model),
             "tools": tools,
             "tool_choice": "required",
         }

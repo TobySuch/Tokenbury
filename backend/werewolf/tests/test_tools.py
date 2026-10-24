@@ -141,3 +141,13 @@ def test_empty_note():
     assert validate_tool_call("append_note", {"text": " "}, ctx())
     assert validate_tool_call("replace_notes", {}, ctx())
     assert validate_tool_call("append_note", {"text": 1}, ctx())
+
+
+def test_speak_schema_states_the_character_cap():
+    from werewolf.tools import tools_for
+
+    (speak,) = [
+        t for t in tools_for("discussion", 250) if t["function"]["name"] == "speak"
+    ]
+    desc = speak["function"]["parameters"]["properties"]["message"]["description"]
+    assert "250 characters" in desc

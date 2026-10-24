@@ -142,3 +142,25 @@ def test_replay_agent_yields_then_raises_on_errors():
     assert agent.respond(MESSAGES, TOOLS) is ok
     with pytest.raises(LLMError, match="boom"):
         agent.respond(MESSAGES, TOOLS)
+
+
+@patch("werewolf.agents.post_chat")
+def test_llm_agent_marks_system_prompt_cacheable_for_anthropic(mock_post):
+    mock_post.return_value = _body([_tc("a", "pass", "{}")])
+    messages = [
+        {"role": "system", "content": "rules and log"},
+        {"role": "user", "content": "your turn"},
+    ]
+
+    LLMAgent(model="anthropic/claude-haiku-5.5").respond(messages, TOOLS)
+
+    sent = mock_post.call_args[0][0]["messages"]
+    assert sent[0]["content"] == [
+        {
+            "type": "text",
+            "text": "rules and log",
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+    assert sent[1] == messages[1]
+    assert messages[0]["content"] == "rules and log"  # caller's list untouched
