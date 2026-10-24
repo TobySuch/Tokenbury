@@ -114,3 +114,43 @@ def test_change_page_shows_settings_read_only(admin_client):
     assert "seed" not in form.fields
     assert "status" in form.fields  # can still abort a game by hand
     assert '"max_days": 8' in html.unescape(resp.content.decode())
+
+
+def test_admin_created_games_start_unpublished(admin_client):
+    make_characters()
+    _post(admin_client)
+    assert Game.objects.get().published is False
+
+
+def test_publish_toggle_on_change_page_and_list(admin_client):
+    make_characters()
+    _post(admin_client, seed="1")
+    game = Game.objects.get()
+    form = (
+        admin_client
+        .get(f"/admin/werewolf/game/{game.pk}/change/")
+        .context["adminform"]
+        .form
+    )
+    assert "published" in form.fields
+    changelist = admin_client.get("/admin/werewolf/game/").context["cl"]
+    assert "published" in changelist.list_display
+    assert "published" in changelist.list_filter
+
+
+def test_publish_and_unpublish_actions(admin_client):
+    make_characters()
+    _post(admin_client, seed="1")
+    game = Game.objects.get()
+    admin_client.post(
+        "/admin/werewolf/game/",
+        {"action": "publish_games", "_selected_action": [game.pk]},
+    )
+    game.refresh_from_db()
+    assert game.published is True
+    admin_client.post(
+        "/admin/werewolf/game/",
+        {"action": "unpublish_games", "_selected_action": [game.pk]},
+    )
+    game.refresh_from_db()
+    assert game.published is False

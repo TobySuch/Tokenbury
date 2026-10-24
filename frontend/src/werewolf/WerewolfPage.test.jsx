@@ -326,3 +326,10 @@ describe('winnerText', () => {
     expect(winnerText(winner)).toBe(text)
   })
 })
+
+test('a game that is missing or unpublished shows a not-found message', async () => {
+  globalThis.fetch = vi.fn(() => Promise.resolve({ ok: false, status: 404 }))
+  await renderPage('/werewolf/99')
+  expect(screen.getByText(/this game isn.t available/i)).toBeInTheDocument()
+  expect(screen.queryByText(/gathering the players/i)).toBeNull()
+})

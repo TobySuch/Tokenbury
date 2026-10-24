@@ -95,6 +95,14 @@ function GameView({ gameId }) {
     }
   }, [gameId])
 
+  // Beats have loaded but the game hasn't: it doesn't exist or isn't published.
+  if (beats && !game) {
+    return (
+      <p className="flex-1 p-8 text-center italic text-ink-muted">
+        This game isn&rsquo;t available.
+      </p>
+    )
+  }
   if (!game || !beats || !players) {
     return <p className="flex-1 p-8 text-center italic text-ink-muted">Gathering the players…</p>
   }

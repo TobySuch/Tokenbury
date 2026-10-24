@@ -53,6 +53,9 @@ class Game(models.Model):
     winner = models.CharField(
         max_length=20, choices=Winner.choices, null=True, blank=True
     )
+    # Unpublished games are hidden from the public API and skipped by the
+    # scheduler, so a game can be set up before it goes live.
+    published = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

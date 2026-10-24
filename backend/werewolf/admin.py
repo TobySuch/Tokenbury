@@ -80,9 +80,11 @@ class GameAdmin(admin.ModelAdmin):
         "phase",
         "day_number",
         "winner",
+        "published",
         "created_at",
     )
-    list_filter = ("status", "phase", "winner")
+    list_filter = ("published", "status", "phase", "winner")
+    actions = ["publish_games", "unpublish_games"]
     inlines = [PlayerInline]
     readonly_fields = (
         "seed",
@@ -92,7 +94,15 @@ class GameAdmin(admin.ModelAdmin):
         "created_at",
         "settings",
     )
-    fields = ("status", *readonly_fields)
+    fields = ("published", "status", *readonly_fields)
+
+    @admin.action(description="Publish selected games")
+    def publish_games(self, request, queryset):
+        queryset.update(published=True)
+
+    @admin.action(description="Unpublish selected games")
+    def unpublish_games(self, request, queryset):
+        queryset.update(published=False)
 
     @admin.display(description="Settings")
     def settings(self, obj):

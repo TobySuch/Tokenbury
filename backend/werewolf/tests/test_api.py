@@ -16,11 +16,11 @@ def client():
 @pytest.fixture
 def game():
     make_characters(7)
-    return create_game(seed=2)
+    return create_game(seed=2, published=True)
 
 
 def test_game_list_newest_first_and_shape(client, game):
-    newer = Game.objects.create(seed=9)
+    newer = Game.objects.create(seed=9, published=True)
     data = client.get("/api/werewolf/games/").json()
     assert [g["id"] for g in data] == [newer.id, game.id]
     assert set(data[0]) == {
@@ -91,3 +91,14 @@ def test_notes(client, game):
     assert client.get(url, {"player": "x", "at": 1}).status_code == 400
     assert client.get(url, {"player": p.id}).status_code == 400
     assert client.get(url, {"player": 99999, "at": 1}).status_code == 404
+
+
+def test_unpublished_games_are_hidden(client, game):
+    hidden = create_game(seed=3)
+    assert hidden.published is False
+    ids = [g["id"] for g in client.get("/api/werewolf/games/").json()]
+    assert ids == [game.id]
+    player = hidden.players.first()
+    for path in ["", "players/", "beats/", f"notes/?player={player.id}&at=1"]:
+        resp = client.get(f"/api/werewolf/games/{hidden.id}/{path}")
+        assert resp.status_code == 404, path

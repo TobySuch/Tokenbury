@@ -88,3 +88,13 @@ def test_config_overrides(cast):
 def test_create_game_picks_subset(cast):
     game = create_game(seed=1)
     assert Player.objects.filter(game=game).count() == 7
+
+
+@pytest.mark.django_db
+def test_new_games_start_unpublished_unless_asked():
+    from werewolf.setup import create_game
+    from werewolf.tests.factories import make_characters
+
+    make_characters()
+    assert create_game(seed=1).published is False
+    assert create_game(seed=2, published=True).published is True

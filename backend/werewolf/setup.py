@@ -19,7 +19,7 @@ WIN_CONDITIONS = {
 
 
 @transaction.atomic
-def create_game(seed=None, config=None) -> Game:
+def create_game(seed=None, config=None, published=False) -> Game:
     cfg = build_config(config)
     characters = list(Character.objects.order_by("name"))
     if len(characters) < PLAYER_COUNT:
@@ -35,6 +35,7 @@ def create_game(seed=None, config=None) -> Game:
         phase=Game.Phase.NIGHT_WOLF_CHAT,
         day_number=1,
         config=cfg,
+        published=published,
     )
     cast = rng_for(game, "cast").sample(characters, PLAYER_COUNT)
     roles = list(ROLE_DECK)

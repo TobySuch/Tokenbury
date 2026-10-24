@@ -15,13 +15,17 @@ def _int_param(request, name):
         return None
 
 
+def _published():
+    return Game.objects.filter(published=True)
+
+
 def _game_or_404(pk):
-    return Game.objects.filter(pk=pk).first()
+    return _published().filter(pk=pk).first()
 
 
 @api_view(["GET"])
 def game_list(request):
-    games = Game.objects.order_by("-created_at", "-id")
+    games = _published().order_by("-created_at", "-id")
     return Response(GameSerializer(games, many=True).data)
 
 

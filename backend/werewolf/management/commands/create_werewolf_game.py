@@ -15,6 +15,11 @@ class Command(BaseCommand):
             metavar="KEY=VALUE",
             help="Config overrides",
         )
+        parser.add_argument(
+            "--publish",
+            action="store_true",
+            help="Make the game visible on the site straight away.",
+        )
 
     def handle(self, *args, **options):
         overrides = {}
@@ -24,7 +29,10 @@ class Command(BaseCommand):
                 raise CommandError(f"Config must be key=value, got {item!r}")
             overrides[key] = value
         try:
-            game = create_game(seed=options["seed"], config=overrides)
+            game = create_game(
+                seed=options["seed"], config=overrides, published=options["publish"]
+            )
         except ValueError as exc:
             raise CommandError(str(exc)) from exc
-        self.stdout.write(f"Created game {game.pk} (seed {game.seed}).")
+        state = "published" if game.published else "unpublished"
+        self.stdout.write(f"Created game {game.pk} (seed {game.seed}, {state}).")

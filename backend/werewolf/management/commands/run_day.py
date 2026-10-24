@@ -58,7 +58,12 @@ class Command(BaseCommand):
                 return Game.objects.get(pk=game_id)
             except Game.DoesNotExist:
                 raise CommandError(f"Game {game_id} does not exist") from None
-        return Game.objects.filter(status=Game.Status.ACTIVE).order_by("-id").first()
+        return (
+            Game.objects
+            .filter(status=Game.Status.ACTIVE, published=True)
+            .order_by("-id")
+            .first()
+        )
 
     def _day_completed_today(self, game) -> bool:
         today = now_local().date()
@@ -77,7 +82,7 @@ class Command(BaseCommand):
     def _run(self, options):
         game = self._find_game(options["game"])
         if game is None:
-            self.stdout.write("No active game to run.")
+            self.stdout.write("No published active game to run.")
             return
         if game.status != Game.Status.ACTIVE:
             self.stdout.write(f"Game {game.pk} is {game.status}; nothing to run.")
