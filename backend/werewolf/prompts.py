@@ -72,8 +72,7 @@ said what, who you suspect and why, vote results, and what the dead revealed.
 - Wolves may lie. Villagers should expect lies."""
 
 WOLF_GUIDANCE = (
-    "- In wolf chat, never name yourself or your teammate. "
-    "Do not name yourself or your teammate; use Wolf A and Wolf B."
+    "- In wolf chat, do not name yourself or your teammate. Use Wolf A and Wolf B."
 )
 SEER_GUIDANCE = (
     "- You cannot speak at night. Work out who the wolves are from how they talk."

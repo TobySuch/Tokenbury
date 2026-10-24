@@ -104,14 +104,14 @@ def test_wolf_sees_teammate_and_labels():
     assert "Wanda" in t
     assert "Wolf A" in t
     assert "Wolf B" in t
-    assert "Do not name yourself or your teammate" in t
+    assert "do not name yourself or your teammate" in t
 
 
 def test_role_specific_guidance_only_to_that_role():
     wolf = text(build(view("wolf", teammate_name="W", teammate_label="Wolf B")))
     seer = text(build(view("seer")))
     vill = text(build(view("villager")))
-    assert "Do not name yourself or your teammate" not in seer + vill
+    assert "do not name yourself or your teammate" not in seer + vill
     assert "Work out who the wolves are from how they talk" in seer
     assert "Work out who the wolves are from how they talk" not in wolf + vill
     for t in (wolf, seer, vill):
