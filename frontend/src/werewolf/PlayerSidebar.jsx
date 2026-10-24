@@ -39,7 +39,7 @@ export default function PlayerSidebar({ gameId, player, alive, seq }) {
             <p
               data-testid="player-notes"
               tabIndex={0}
-              className="mt-0.5 max-h-64 overflow-y-auto overscroll-contain whitespace-pre-wrap pr-1 text-sm text-ink-soft lg:max-h-[50vh]"
+              className="mt-0.5 max-h-24 overflow-y-auto overscroll-contain whitespace-pre-wrap pr-1 text-sm text-ink-soft sm:max-h-48 lg:max-h-[50vh]"
             >
               {loaded.key !== key
                 ? 'Loading…'
