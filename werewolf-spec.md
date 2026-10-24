@@ -302,3 +302,50 @@ The most important tests prove nobody can see what they should not. Everything e
 - **Beats.** Building beats from a scripted game gives the expected sequence.
 - **Moderator view.** The moderator prompt contains no roles, notes or wolf chat, only public events plus its own earlier picks.
 - **Log window.** A player's prompt contains only the current day's events, earlier days appear only through their notes, and each survivor gets exactly one day-notes turn.
+
+## Addendum: player count, Doctor and Lovers
+
+Oct 24, 2026. Extends the MVP. Where this section and the earlier ones disagree, this section wins.
+
+### Player count and role mix
+
+- New settings: `player_count` (default 7, allowed 5 to 12) and optional overrides `wolf_count`, `seer_count`, `doctor_count` (default `null`, meaning auto).
+- Auto mix: wolves = `max(1, round(player_count / 3.5))`; 1 seer; 1 doctor when `player_count >= 6`; the rest are villagers. The default 7-player game becomes 2 wolves, 1 seer, 1 doctor, 3 villagers.
+- Validation when a game is created: at least 1 wolf; wolves strictly fewer than everyone else; at most 1 seer and at most 1 doctor; role counts must not exceed `player_count`. The game needs at least `player_count` characters; the seeded cast grows to 12.
+- Wolf labels go Wolf A, Wolf B, Wolf C, in seat order. With more than two wolves, wolf chat rotates through the living wolves in seat order, and agreement means every living wolf's latest named target is the same.
+- The public rules state the role counts for this game (standard Werewolf: everyone knows the mix, not who holds which role).
+
+### Doctor
+
+- **Night action.** A new `night_doctor` phase runs after wolf chat and before the seer's turn. The living doctor calls `protect(target)` or `pass`. The doctor does not see wolf chat.
+- **Rules.** The target must be a living player. The doctor may protect themselves. They may not protect the same player as the previous night (validation error, then fallback to `pass`).
+- **Events.** `protect` {target_id}, visibility `player:<doctor id>`. In the morning, if the wolves' target was protected, nobody dies: the engine writes a public `peaceful_night` event ("Nobody died last night") and a private `save_result` {saved: true|false} for the doctor. A failed protection just shows the normal death.
+- **Win condition.** Town.
+
+### Lovers
+
+- **Setting.** `lovers` (default on). At game creation the engine secretly links two random players (seeded), never two wolves. Ground truth goes on `Player.lover` (self-referential FK).
+- **Knowledge.** Each lover's `role_assigned` payload names their partner, but not the partner's role. Nobody else is told, including the seer and the wolves.
+- **Lovers' chat.** A new `night_lovers` phase runs after the doctor's turn while both lovers are alive. They alternate for up to `lovers_chat_max_messages` turns (default 4, so 2 each), with `speak` or `pass`. Messages are `lover_message` events with a new visibility value, `lovers`, seen only by the two lovers (and spectators). No name guard and no anonymisation.
+- **Heartbreak.** When a lover dies by any cause, their partner immediately dies too: a public `death` with cause `heartbreak`, with the role revealed per `reveal_role_on_death`. The win check runs after the heartbreak death.
+- **Win.** A mixed couple is one wolf and one non-wolf. If the only two players left alive are a mixed couple, the winner is `lovers`. This check runs before the normal wolf and town checks. Otherwise a lover wins or loses with their own team. Lovers are told: "If your partner turns out to be on the other side, you can also win by being the last two left alive."
+- **Prompt.** Lovers get a section naming their partner, the heartbreak rule and the win condition above. The public rules say there may be a pair of secret lovers when `lovers` is on.
+
+### Phase order
+
+`night_wolf_chat` → `night_doctor` → `night_lovers` → `night_seer` → `morning` → `discussion` → `vote` → `elimination` → `day_notes`. A step whose role holder is dead or absent is skipped with no agent call.
+
+### Visibility changes
+
+| `visibility` | Who sees it | Example |
+| --- | --- | --- |
+| `lovers` | The two lovers | `lover_message` |
+| `player:<id>` | That player | `protect`, `save_result` |
+
+The seer still sees only `wolf_chat`. The leak canary, seer anonymity and visibility property tests extend to the new channels and to player counts from 5 to 12.
+
+### Spectator view
+
+- New beats: `protect` (night, the doctor lit, target named), `lover_message` (bubble on the speaking lover, the two lovers lit, others dimmed), `peaceful_night` (morning banner: nobody died), and `heartbreak` (the partner fades out with a role badge).
+- A heart marker links the lovers' seats for spectators throughout. The Doctor gets its own role badge colour. A `lovers` winner shows "The lovers win".
+- The players endpoint adds `lover_id`.
