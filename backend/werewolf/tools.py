@@ -7,7 +7,7 @@ TERMINAL_TOOLS = {"speak", "pass", "vote"}
 NOTE_TOOLS = {"append_note", "replace_notes"}
 
 
-def _tool(name, description, properties=None, required=None):
+def function_tool(name, description, properties=None, required=None):
     return {
         "type": "function",
         "function": {
@@ -29,7 +29,7 @@ def _speak(wolf_chat):
             "type": "string",
             "description": "Optional: the living non-wolf you propose to kill.",
         }
-    return _tool(
+    return function_tool(
         "speak",
         "Say something to the wolves (private)."
         if wolf_chat
@@ -39,8 +39,8 @@ def _speak(wolf_chat):
     )
 
 
-_PASS = _tool("pass", "End your turn without speaking.")
-_VOTE = _tool(
+_PASS = function_tool("pass", "End your turn without speaking.")
+_VOTE = function_tool(
     "vote",
     "Cast your secret vote for a player, or for no one.",
     {
@@ -51,13 +51,13 @@ _VOTE = _tool(
     },
     ["target"],
 )
-_APPEND = _tool(
+_APPEND = function_tool(
     "append_note",
     "Add text to the end of your private notes.",
     {"text": {"type": "string"}},
     ["text"],
 )
-_REPLACE = _tool(
+_REPLACE = function_tool(
     "replace_notes",
     "Rewrite your whole private notes. Warning: rewriting can drop earlier "
     "facts, so prefer append_note unless you are condensing.",

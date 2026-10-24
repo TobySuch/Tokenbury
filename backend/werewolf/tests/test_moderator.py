@@ -18,10 +18,10 @@ from werewolf.moderator import (
     moderate,
     moderator_prompt_for,
     moderator_tools,
-    simulate_discussion,
 )
 from werewolf.setup import create_game
 from werewolf.tests.factories import make_characters
+from werewolf.tests.helpers import simulate_discussion
 from werewolf.turns import BudgetExceeded
 
 pytestmark = pytest.mark.django_db

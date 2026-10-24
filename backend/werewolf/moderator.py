@@ -12,7 +12,7 @@ from werewolf.config import game_config
 from werewolf.events import append_event
 from werewolf.models import ENGINE, PUBLIC, Game, GameEvent, Player
 from werewolf.rng import rng_for
-from werewolf.tools import _tool
+from werewolf.tools import function_tool
 from werewolf.turns import check_budget, log_call
 
 PICK_TOOL = "pick_speaker"
@@ -98,7 +98,7 @@ def forced_end_reason(game: Game, state: DiscussionState) -> str | None:
 
 def moderator_tools() -> list[dict]:
     return [
-        _tool(
+        function_tool(
             PICK_TOOL,
             "Choose who speaks next.",
             {
@@ -107,7 +107,7 @@ def moderator_tools() -> list[dict]:
             },
             ["name", "reason"],
         ),
-        _tool(
+        function_tool(
             END_TOOL,
             "End the discussion (only once the minimum messages is reached).",
             {"reason": {"type": "string", "description": "One-line reason."}},
@@ -282,34 +282,3 @@ def moderate(game: Game, agent: WerewolfAgent, state: DiscussionState) -> dict:
             "source": "fallback",
         },
     )
-
-
-def simulate_discussion(game: Game, agent: WerewolfAgent, actions) -> list[dict]:
-    """Test helper: run the moderator loop; each picked player does the next
-    action ("speech" or "pass", default "speech"). Returns the pick payloads."""
-    actions = iter(actions)
-    payloads = []
-    while True:
-        payload = moderate(game, agent, discussion_state(game))
-        payloads.append(payload)
-        if payload["end"]:
-            return payloads
-        player = game.players.get(pk=payload["pick_id"])
-        if next(actions, "speech") == "pass":
-            append_event(
-                game,
-                type="pass",
-                visibility=ENGINE,
-                phase=Game.Phase.DISCUSSION,
-                actor=player,
-                payload={"phase": "discussion"},
-            )
-        else:
-            append_event(
-                game,
-                type="speech",
-                visibility=PUBLIC,
-                phase=Game.Phase.DISCUSSION,
-                actor=player,
-                payload={"message": f"{player.name} speaks"},
-            )
