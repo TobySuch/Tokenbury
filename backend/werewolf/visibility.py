@@ -73,6 +73,20 @@ def events_visible_to(player, day=None) -> list[VisibleEvent]:
     qs = GameEvent.objects.filter(
         game_id=player.game_id, visibility__in=visibilities
     ).order_by("seq")
+    if not player.alive:
+        death_seq = (
+            GameEvent.objects
+            .filter(
+                game_id=player.game_id,
+                type=GameEvent.Type.DEATH,
+                payload__player_id=player.id,
+            )
+            .order_by("seq")
+            .values_list("seq", flat=True)
+            .first()
+        )
+        if death_seq is not None:
+            qs = qs.filter(seq__lte=death_seq)
     if day is not None:
         qs = qs.filter(day=day)
     events = list(qs)

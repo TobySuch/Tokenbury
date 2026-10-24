@@ -308,3 +308,26 @@ def test_leak_canary(game):
             assert (key in text) == (pid == p.id)
         for pid, key in own_role.items():
             assert (key in text) == (pid == p.id)
+
+
+def test_dead_player_cutoff_holds_when_day_filter_excludes_death(game):
+    v1, v2 = villagers(game)[:2]
+    append_event(
+        game,
+        type="death",
+        visibility=PUBLIC,
+        day=1,
+        payload={"player_id": v1.id, "cause": "night_kill", "role": "villager"},
+    )
+    append_event(
+        game,
+        type="speech",
+        visibility=PUBLIC,
+        day=2,
+        actor=v2,
+        payload={"message": "later"},
+    )
+    Player.objects.filter(pk=v1.pk).update(alive=False)
+    v1.refresh_from_db()
+    assert events_visible_to(v1, day=2) == []
+    assert len(events_visible_to(v2, day=2)) == 1
