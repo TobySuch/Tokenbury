@@ -11,6 +11,34 @@ body {
 :root {
   --map-height-offset: 17rem;
 }
+
+/* Palette tokens. Default is the daytime parchment; wrapper classes such as
+   .theme-night override them so components never need forking. */
+@theme {
+  --color-paper: #faf5e4;
+  --color-paper-hover: #f0e6c8;
+  --color-chip: #f5edcf;
+  --color-rule: #d4bc8a;
+  --color-ink: #3d2b1f;
+  --color-ink-soft: #6b4f35;
+  --color-ink-muted: #9c7e5f;
+  --color-ink-faint: #b09070;
+  --color-accent: #c98a2b;
+  --color-accent-ink: #2a1a0c;
+}
+
+.theme-night {
+  --color-paper: #141a2e;
+  --color-paper-hover: #1f2742;
+  --color-chip: #1b2340;
+  --color-rule: #3a456b;
+  --color-ink: #e8e4f4;
+  --color-ink-soft: #c3c0dc;
+  --color-ink-muted: #8d93b8;
+  --color-ink-faint: #6f7599;
+  --color-accent: #e0a63c;
+  --color-accent-ink: #1a1405;
+}
 @media (max-width: 1023px) and (orientation: landscape) {
   :root {
     /* No header on small landscape — offset is just the container's vertical padding */

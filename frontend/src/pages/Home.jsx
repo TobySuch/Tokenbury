@@ -190,7 +190,7 @@ function Home() {
       <div className="min-w-0 p-4 lg:w-2/3 lg:flex-none">
         {/* Portrait mini nav — above map, small portrait screens only */}
         <div className="hidden max-lg:portrait:flex items-center gap-3 pb-2">
-          <img src="/assets/logo.png" alt="Tokenbury-on-Sea" className="h-8 w-auto" />
+          <img src="/assets/logo.webp" alt="Tokenbury-on-Sea" className="h-8 w-auto" />
           <div className="ml-auto flex gap-3">
             <button
               className={BTN}
@@ -215,7 +215,7 @@ function Home() {
         <div className="max-lg:landscape:flex max-lg:landscape:items-center max-lg:landscape:gap-2">
           {/* Landscape mini nav — logo + stacked buttons left of map, small landscape only */}
           <div className="hidden max-lg:landscape:flex flex-col items-center gap-2">
-            <img src="/assets/logo.png" alt="Tokenbury-on-Sea" className="h-8 w-auto" />
+            <img src="/assets/logo.webp" alt="Tokenbury-on-Sea" className="h-8 w-auto" />
             <button
               className={BTN}
               onClick={handlePrevTick}

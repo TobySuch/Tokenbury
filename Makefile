@@ -1,4 +1,4 @@
-.PHONY: dev backend frontend prod prod-down prod-ticker install migrate makemigrations shell createsuperuser lint format test ticker
+.PHONY: dev backend frontend prod prod-down prod-ticker install migrate makemigrations shell createsuperuser lint format test ticker prod-werewolf werewolf-game werewolf-day
 
 # ─── Dev Servers ─────────────────────────────────────────────────────────────
 
@@ -18,6 +18,9 @@ prod:
 
 prod-ticker:
 	docker compose --profile ticker up --build -d
+
+prod-werewolf:
+	docker compose --profile werewolf up --build -d
 
 prod-down:
 	docker compose down
@@ -50,6 +53,14 @@ createsuperuser:
 
 ticker:
 	cd backend && uv run python manage.py run_ticker $(ARGS)
+
+# ─── Werewolf ─────────────────────────────────────────────────────────────────
+
+werewolf-game:
+	cd backend && uv run python manage.py create_werewolf_game $(ARGS)
+
+werewolf-day:
+	cd backend && uv run python manage.py run_day $(ARGS)
 
 # ─── Code Quality ─────────────────────────────────────────────────────────────
 

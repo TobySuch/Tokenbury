@@ -13,8 +13,14 @@ class Instance(models.Model):
 
 
 class Banner(models.Model):
+    class Site(models.TextChoices):
+        BOTH = "both", "Both sites"
+        TOWN = "town", "Town"
+        WEREWOLF = "werewolf", "Werewolf"
+
     text = models.TextField()
     active = models.BooleanField(default=True)
+    site = models.CharField(max_length=10, choices=Site.choices, default=Site.BOTH)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

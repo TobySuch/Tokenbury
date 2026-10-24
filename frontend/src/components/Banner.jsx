@@ -1,16 +1,22 @@
 import { useState, useEffect } from 'react'
 import { fetchBanner } from '../api/client'
 
-function Banner() {
+function Banner({ site = 'town' }) {
   const [banner, setBanner] = useState(null)
 
   useEffect(() => {
-    fetchBanner().then(setBanner)
-    const id = setInterval(() => {
-      fetchBanner().then(setBanner)
-    }, 30_000)
-    return () => clearInterval(id)
-  }, [])
+    let cancelled = false
+    const load = () =>
+      fetchBanner(site).then((b) => {
+        if (!cancelled) setBanner(b)
+      })
+    load()
+    const id = setInterval(load, 30_000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [site])
 
   if (!banner) return null
 

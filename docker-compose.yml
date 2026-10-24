@@ -26,6 +26,16 @@ services:
     profiles:
       - ticker
 
+  werewolf:
+    image: ghcr.io/tobysuch/tokenbury:latest
+    env_file: .env
+    entrypoint: ./werewolf_entrypoint.sh
+    depends_on:
+      - db
+    restart: unless-stopped
+    profiles:
+      - werewolf
+
   caddy:
     image: caddy:alpine
     ports:

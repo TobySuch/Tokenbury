@@ -183,6 +183,20 @@ cd frontend && bun run test
 
 ---
 
+## Werewolf
+
+A separate game app (`backend/werewolf/`, frontend at `/werewolf` in `frontend/src/werewolf/`). It shares no models with the live sim. Visibility is structural: agent prompts are built only from `werewolf.visibility.events_visible_to(player)`, that player's own notes, their own PlayerView, and the public roster (names, alive/dead, and roles of the dead only when `reveal_role_on_death` is on) — never add another path from game state to a prompt.
+
+```bash
+make werewolf-game ARGS="--seed 7 --publish"  # create a game (run seed_werewolf_characters first); omit --publish to keep it hidden
+make werewolf-day ARGS="--scripted --until-over"  # play with scripted agents, no LLM
+make werewolf-day                             # play one day with the LLM (costs money)
+```
+
+Game settings and werewolf env vars are documented in the README ("Werewolf" section). Keep that table in sync with `werewolf/config.py` `DEFAULT_CONFIG`.
+
+---
+
 ## Django Apps
 
 | App          | Responsibility                                                            |
@@ -193,6 +207,7 @@ cd frontend && bun run test
 | `simulation` | Tick runner, prompt builder, LLM calls                                    |
 | `api`        | DRF serialisers and REST views                                            |
 | `live`       | Django Channels WebSocket consumers                                       |
+| `werewolf`   | Self-contained Werewolf game played by agents — see `werewolf-spec.md`    |
 
 ---
 
