@@ -48,3 +48,16 @@ test('App renders the town map image', async () => {
   })
   expect(screen.getByRole('img', { name: /tokenbury.*map/i })).toBeInTheDocument()
 })
+
+test('App links to the werewolf page from both navs', async () => {
+  await act(async () => {
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    )
+  })
+  const links = screen.getAllByRole('link', { name: 'Werewolf' })
+  expect(links.length).toBe(2)
+  links.forEach((l) => expect(l).toHaveAttribute('href', '/werewolf'))
+})

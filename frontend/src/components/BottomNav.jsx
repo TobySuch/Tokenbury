@@ -24,6 +24,16 @@ function BottomNav() {
       >
         About
       </NavLink>
+      <NavLink
+        to="/werewolf"
+        className={({ isActive }) =>
+          `flex flex-1 items-center justify-center py-3 text-sm font-semibold transition-colors ${
+            isActive ? 'bg-[#f0e6c8] text-[#3d2b1f]' : 'text-[#7a6248] hover:bg-[#f0e6c8]'
+          }`
+        }
+      >
+        Werewolf
+      </NavLink>
     </nav>
   )
 }
