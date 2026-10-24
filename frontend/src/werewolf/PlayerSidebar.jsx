@@ -3,7 +3,7 @@ import Panel from '../components/ui/Panel'
 import Pill from '../components/ui/Pill'
 import { fetchNotes } from './api'
 
-export default function PlayerSidebar({ gameId, player, alive, seq }) {
+export default function PlayerSidebar({ gameId, player, alive, seq, players = [] }) {
   const key = player && seq != null ? `${player.id}:${seq}` : null
   const [loaded, setLoaded] = useState({ key: null, text: '' })
 
@@ -17,6 +17,8 @@ export default function PlayerSidebar({ gameId, player, alive, seq }) {
       cancelled = true
     }
   }, [gameId, key, player?.id, seq])
+
+  const partner = player?.lover_id != null ? players.find((p) => p.id === player.lover_id) : null
 
   return (
     <Panel data-testid="player-sidebar" className="p-4 transition-colors duration-500">
@@ -33,6 +35,7 @@ export default function PlayerSidebar({ gameId, player, alive, seq }) {
               {player.wolf_label ? `${player.wolf_label} · ` : ''}
               {alive ? 'Alive' : 'Dead'}
             </p>
+            {partner && <p className="text-sm text-red-600">In love with {partner.name}</p>}
           </div>
           <div className="border-l-2 border-rule pl-3">
             <p className="text-xs font-semibold text-ink-muted">Private notes at this step</p>

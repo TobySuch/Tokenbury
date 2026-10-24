@@ -2,6 +2,7 @@ const TONES = {
   neutral: 'border-rule bg-chip text-ink',
   wolf: 'border-red-700 bg-red-700 text-white',
   seer: 'border-indigo-500 bg-indigo-500 text-white',
+  doctor: 'border-emerald-600 bg-emerald-600 text-white',
   villager: 'border-rule bg-chip text-ink',
 }
 
