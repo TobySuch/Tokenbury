@@ -8,8 +8,7 @@ from werewolf.agents import ReplayAgent, ScriptedAgent
 from werewolf.models import AgentCall, Game, PlayerNotes
 from werewolf.notes import current_notes
 from werewolf.prompts import Turn
-from werewolf.setup import create_game
-from werewolf.tests.factories import make_characters
+from werewolf.tests.factories import create_classic_game, make_characters
 from werewolf.tools import ValidationContext
 from werewolf.turns import (
     BudgetExceeded,
@@ -28,7 +27,7 @@ PASS = ("pass", {})
 
 def build(config=None, seed=3):
     make_characters()
-    game = create_game(seed=seed)
+    game = create_classic_game(seed=seed)
     if config:
         game.config = config
         game.save()
@@ -416,7 +415,7 @@ def test_invalid_call_retries_twice_then_falls_back(game, case):
 
 def test_replay_reproduces_turn_results():
     game_a = build()
-    game_b = create_game(seed=3)
+    game_b = create_classic_game(seed=3)
 
     def play(game, agent_for):
         p = villager(game)

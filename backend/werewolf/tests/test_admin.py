@@ -101,6 +101,32 @@ def test_too_few_characters_explains_how_to_seed_them(admin_client):
     assert not Game.objects.exists()
 
 
+def test_invalid_role_mix_shows_form_error(admin_client):
+    make_characters(12)
+    resp = _post(admin_client, config={"wolf_count": 0})
+    assert resp.status_code == 200
+    assert "at least 1 wolf" in str(resp.context["adminform"].form.errors["config"])
+    assert not Game.objects.exists()
+
+
+def test_settings_prefill_includes_new_keys(admin_client):
+    initial = admin_client.get(ADD_URL).context["adminform"].form["config"].value()
+    for key in ("player_count", "wolf_count", "lovers", "lovers_chat_max_messages"):
+        assert f'"{key}"' in initial
+
+
+def test_player_count_setting_drives_character_check(admin_client):
+    make_characters(8)
+    resp = _post(admin_client, config={"player_count": 10})
+    assert resp.status_code == 200
+    assert "needs 10 characters" in str(
+        resp.context["adminform"].form.non_field_errors()
+    )
+    resp = _post(admin_client, config={"player_count": 8})
+    assert resp.status_code == 302
+    assert Game.objects.get().players.count() == 8
+
+
 def test_change_page_shows_settings_read_only(admin_client):
     make_characters()
     _post(admin_client, seed="1")

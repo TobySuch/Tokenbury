@@ -5,8 +5,7 @@ from django.core.management import CommandError, call_command
 from django.utils import timezone
 
 from werewolf.models import AgentCall, Character, Game, GameEvent
-from werewolf.setup import create_game
-from werewolf.tests.factories import make_characters
+from werewolf.tests.factories import create_classic_game, make_characters
 
 
 @pytest.fixture(autouse=True)
@@ -32,21 +31,21 @@ def _make_sprites(media_root, n=2):
         (sprites / f"sprite{i}.png").write_bytes(b"\x89PNG fake")
 
 
-def test_seed_creates_seven_idempotently(db, media_root):
+def test_seed_creates_twelve_idempotently(db, media_root):
     _make_sprites(media_root)
     call_command("seed_werewolf_characters")
-    assert Character.objects.count() == 7
+    assert Character.objects.count() == 12
     call_command("seed_werewolf_characters")
-    assert Character.objects.count() == 7
+    assert Character.objects.count() == 12
     talk = {c.talkativeness for c in Character.objects.all()}
-    assert len(talk) >= 4 and all(1 <= t <= 5 for t in talk)
+    assert talk == {1, 2, 3, 4, 5} and all(1 <= t <= 5 for t in talk)
     assert all(c.avatar for c in Character.objects.all())
     assert all((media_root / c.avatar.name).exists() for c in Character.objects.all())
 
 
 def test_seed_without_sprites_creates_characters_without_avatars(db, media_root):
     call_command("seed_werewolf_characters")
-    assert Character.objects.count() == 7
+    assert Character.objects.count() == 12
     assert not any(c.avatar for c in Character.objects.all())
 
 
@@ -57,6 +56,24 @@ def test_create_game_command(db):
     assert game.seed == 11
     assert game.config["max_days"] == 3
     assert game.players.count() == 7
+
+
+def test_create_game_command_player_count_override(db):
+    make_characters(12)
+    call_command(
+        "create_werewolf_game", "--config", "player_count=10", "wolf_count=null"
+    )
+    game = Game.objects.get()
+    assert game.config["player_count"] == 10
+    assert game.players.count() == 10
+    assert game.players.filter(role="wolf").count() == 3
+
+
+def test_create_game_command_invalid_mix(db):
+    make_characters(12)
+    with pytest.raises(CommandError, match="wolf"):
+        call_command("create_werewolf_game", "--config", "wolf_count=0")
+    assert not Game.objects.exists()
 
 
 def test_create_game_command_bad_config(db):
@@ -87,7 +104,7 @@ def at_hour(monkeypatch, hour, day=None):
 
 def test_run_day_scripted_until_over_finishes_game(db, capsys):
     make_characters(7)
-    game = create_game(seed=7, published=True)
+    game = create_classic_game(seed=7, published=True)
     call_command("run_day", "--scripted", "--until-over")
     game.refresh_from_db()
     assert game.status == "finished"
@@ -99,10 +116,10 @@ def test_run_day_scripted_until_over_finishes_game(db, capsys):
 
 def test_run_day_plays_one_day_by_default_on_latest_active(db):
     make_characters(7)
-    old = create_game(seed=1, published=True)
+    old = create_classic_game(seed=1, published=True)
     old.status = "finished"
     old.save()
-    game = create_game(seed=2, published=True)
+    game = create_classic_game(seed=2, published=True)
     call_command("run_day", "--scripted")
     game.refresh_from_db()
     assert game.day_number == 2 and game.phase == "night_wolf_chat"
@@ -112,8 +129,8 @@ def test_run_day_plays_one_day_by_default_on_latest_active(db):
 
 def test_run_day_game_option(db):
     make_characters(7)
-    first = create_game(seed=1)
-    create_game(seed=2)
+    first = create_classic_game(seed=1)
+    create_classic_game(seed=2)
     call_command("run_day", "--scripted", "--game", str(first.pk))
     first.refresh_from_db()
     assert first.day_number == 2
@@ -132,7 +149,7 @@ def test_run_day_without_active_game_is_not_an_error(db, capsys):
 def test_if_due_skips_before_run_hour(db, monkeypatch, settings):
     settings.WEREWOLF_RUN_HOUR = 9
     make_characters(7)
-    game = create_game(seed=3, published=True)
+    game = create_classic_game(seed=3, published=True)
     at_hour(monkeypatch, 8)
     call_command("run_day", "--scripted", "--if-due")
     game.refresh_from_db()
@@ -144,7 +161,7 @@ def test_if_due_runs_after_hour_then_skips_when_already_run_today(
 ):
     settings.WEREWOLF_RUN_HOUR = 9
     make_characters(7)
-    game = create_game(seed=3, published=True)
+    game = create_classic_game(seed=3, published=True)
     at_hour(monkeypatch, 10)
     call_command("run_day", "--scripted", "--if-due")
     game.refresh_from_db()
@@ -159,7 +176,7 @@ def test_if_due_runs_after_hour_then_skips_when_already_run_today(
 def test_if_due_runs_again_next_day(db, monkeypatch, settings):
     settings.WEREWOLF_RUN_HOUR = 9
     make_characters(7)
-    game = create_game(seed=3, published=True)
+    game = create_classic_game(seed=3, published=True)
     now = at_hour(monkeypatch, 10)
     call_command("run_day", "--scripted", "--if-due")
     GameEvent.objects.filter(game=game).update(
@@ -182,8 +199,8 @@ def test_create_game_command_is_unpublished_unless_publish_flag(db):
 
 def test_run_day_default_ignores_unpublished_games(db, capsys):
     make_characters(7)
-    live = create_game(seed=1, published=True)
-    draft = create_game(seed=2)
+    live = create_classic_game(seed=1, published=True)
+    draft = create_classic_game(seed=2)
     call_command("run_day", "--scripted")
     live.refresh_from_db()
     draft.refresh_from_db()
@@ -194,7 +211,7 @@ def test_run_day_default_ignores_unpublished_games(db, capsys):
 
 def test_run_day_with_only_unpublished_games_does_nothing(db, capsys):
     make_characters(7)
-    draft = create_game(seed=2)
+    draft = create_classic_game(seed=2)
     call_command("run_day", "--scripted")
     draft.refresh_from_db()
     assert draft.day_number == 1
@@ -203,7 +220,7 @@ def test_run_day_with_only_unpublished_games_does_nothing(db, capsys):
 
 def test_run_day_game_option_can_run_an_unpublished_game(db):
     make_characters(7)
-    draft = create_game(seed=2)
+    draft = create_classic_game(seed=2)
     call_command("run_day", "--scripted", "--game", str(draft.pk))
     draft.refresh_from_db()
     assert draft.day_number == 2

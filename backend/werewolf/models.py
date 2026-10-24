@@ -3,6 +3,7 @@ from django.db import models
 
 PUBLIC = "public"
 WOLF_CHAT = "wolf_chat"
+LOVERS = "lovers"
 ENGINE = "engine"
 
 
@@ -30,6 +31,8 @@ class Game(models.Model):
     class Phase(models.TextChoices):
         SETUP = "setup"
         NIGHT_WOLF_CHAT = "night_wolf_chat"
+        NIGHT_DOCTOR = "night_doctor"
+        NIGHT_LOVERS = "night_lovers"
         NIGHT_SEER = "night_seer"
         MORNING = "morning"
         DISCUSSION = "discussion"
@@ -41,6 +44,7 @@ class Game(models.Model):
     class Winner(models.TextChoices):
         WOLVES = "wolves"
         TOWN = "town"
+        LOVERS = "lovers"
         DRAW = "draw"
 
     seed = models.BigIntegerField()
@@ -66,6 +70,7 @@ class Player(models.Model):
     class Role(models.TextChoices):
         WOLF = "wolf"
         SEER = "seer"
+        DOCTOR = "doctor"
         VILLAGER = "villager"
 
     game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="players")
@@ -76,6 +81,10 @@ class Player(models.Model):
     role = models.CharField(max_length=20, choices=Role.choices)
     alive = models.BooleanField(default=True)
     wolf_label = models.CharField(max_length=20, null=True, blank=True)
+    # Secret partner (symmetric: set on both lovers). Ground truth for the engine.
+    lover = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
 
     class Meta:
         ordering = ["seat"]
@@ -101,6 +110,10 @@ class GameEvent(models.Model):
         ROLE_ASSIGNED = "role_assigned"
         WOLF_MESSAGE = "wolf_message"
         WOLF_TARGET = "wolf_target"
+        PROTECT = "protect"
+        SAVE_RESULT = "save_result"
+        PEACEFUL_NIGHT = "peaceful_night"
+        LOVER_MESSAGE = "lover_message"
         DEATH = "death"
         SPEECH = "speech"
         VOTE_CAST = "vote_cast"

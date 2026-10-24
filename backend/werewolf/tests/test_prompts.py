@@ -12,8 +12,7 @@ from werewolf.prompts import (
     player_view,
     render_event,
 )
-from werewolf.setup import create_game
-from werewolf.tests.factories import make_characters
+from werewolf.tests.factories import create_classic_game, make_characters
 from werewolf.visibility import RosterEntry, VisibleEvent
 
 pytestmark = pytest.mark.django_db
@@ -43,8 +42,6 @@ def view(role="villager", talk=3, **kw):
         "talkativeness": talk,
         "win_condition": "Win when every wolf has been eliminated.",
         "wolf_label": None,
-        "teammate_name": None,
-        "teammate_label": None,
     }
     base.update(kw)
     return PlayerView(**base)
@@ -97,18 +94,28 @@ def test_wolf_sees_teammate_and_labels():
     v = view(
         "wolf",
         wolf_label="Wolf A",
-        teammate_name="Wanda",
-        teammate_label="Wolf B",
+        teammates=(("Wanda", "Wolf B"),),
     )
     t = text(build(v))
     assert "Wanda" in t
     assert "Wolf A" in t
     assert "Wolf B" in t
     assert "do not name yourself or your teammate" in t
+    assert "Your teammate is Wanda (Wolf B)." in t
+
+
+def test_wolf_with_several_teammates_lists_them_all():
+    v = view(
+        "wolf",
+        wolf_label="Wolf A",
+        teammates=(("Wanda", "Wolf B"), ("Wilf", "Wolf C")),
+    )
+    t = text(build(v))
+    assert "Your teammates are Wanda (Wolf B) and Wilf (Wolf C)." in t
 
 
 def test_role_specific_guidance_only_to_that_role():
-    wolf = text(build(view("wolf", teammate_name="W", teammate_label="Wolf B")))
+    wolf = text(build(view("wolf", teammates=(("W", "Wolf B"),))))
     seer = text(build(view("seer")))
     vill = text(build(view("villager")))
     assert "do not name yourself or your teammate" not in seer + vill
@@ -225,7 +232,7 @@ def test_engine_event_never_in_prompt():
 @pytest.fixture
 def game():
     make_characters()
-    return create_game(seed=3)
+    return create_classic_game(seed=3)
 
 
 def canary(label):
@@ -347,12 +354,12 @@ def test_player_view_from_player(game):
     assert v.name == w.name
     assert v.role == "wolf"
     assert v.wolf_label == w.wolf_label
-    assert v.teammate_name is not None
+    assert len(v.teammates) == 1
     assert v.win_condition
     s = game.players.get(role="seer")
     sv = player_view(s)
     assert sv.wolf_label is None
-    assert sv.teammate_name is None
+    assert sv.teammates == ()
 
 
 def test_dead_roster_flag_via_pipeline(game):

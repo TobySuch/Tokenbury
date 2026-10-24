@@ -3,8 +3,7 @@ import pytest
 from werewolf import engine
 from werewolf.engine import ScriptedProvider, run_day
 from werewolf.models import AgentCall
-from werewolf.setup import create_game
-from werewolf.tests.factories import make_characters
+from werewolf.tests.factories import create_classic_game, make_characters
 from werewolf.tests.helpers import events_of
 
 pytestmark = pytest.mark.django_db
@@ -29,7 +28,7 @@ def comparable(game):
 
 
 def clean_run(seed):
-    game = create_game(seed=seed)
+    game = create_classic_game(seed=seed)
     phases = []
     real = engine.run_turn
 
@@ -47,7 +46,7 @@ def clean_run(seed):
 
 
 def crash_then_resume(seed, crash_at, monkeypatch):
-    game = create_game(seed=seed)
+    game = create_classic_game(seed=seed)
     real = engine.run_turn
     calls = {"n": 0}
 

@@ -14,6 +14,11 @@ CAST = [
     ("Edith", 1),
     ("Cuthbert", 3),
     ("Pippa", 5),
+    ("Winifred", 2),
+    ("Horace", 4),
+    ("Beryl", 3),
+    ("Clive", 1),
+    ("Maud", 5),
 ]
 
 

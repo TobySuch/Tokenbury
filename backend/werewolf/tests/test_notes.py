@@ -9,8 +9,7 @@ from werewolf.notes import (
     notes_as_of,
     replace_notes,
 )
-from werewolf.setup import create_game
-from werewolf.tests.factories import make_characters
+from werewolf.tests.factories import create_classic_game, make_characters
 
 pytestmark = pytest.mark.django_db
 
@@ -18,7 +17,7 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def game():
     make_characters()
-    return create_game(seed=3)
+    return create_classic_game(seed=3)
 
 
 @pytest.fixture
@@ -62,7 +61,7 @@ def test_cap_reports_remaining(player):
 
 def test_cap_from_config():
     make_characters()
-    g = create_game(seed=5, config={"notes_max_chars": 10})
+    g = create_classic_game(seed=5, config={"notes_max_chars": 10})
     p = g.players.first()
     with pytest.raises(NotesError):
         append_note(p, "x" * 11)

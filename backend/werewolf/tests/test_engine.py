@@ -10,8 +10,7 @@ from werewolf.engine import (
     validation_context,
 )
 from werewolf.models import AgentCall, Character, Game, GameEvent, Player
-from werewolf.setup import create_game
-from werewolf.tests.factories import make_characters
+from werewolf.tests.factories import create_classic_game, make_characters
 from werewolf.tests.helpers import events_of
 
 pytestmark = pytest.mark.django_db
@@ -20,7 +19,7 @@ pytestmark = pytest.mark.django_db
 def new_game(seed=5, config=None):
     if not Character.objects.exists():
         make_characters(7)
-    return create_game(seed=seed, config=config)
+    return create_classic_game(seed=seed, config=config)
 
 
 def by_role(game, role):

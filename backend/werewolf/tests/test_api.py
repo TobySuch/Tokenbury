@@ -2,8 +2,7 @@ import pytest
 from rest_framework.test import APIClient
 
 from werewolf.models import Game, PlayerNotes
-from werewolf.setup import create_game
-from werewolf.tests.factories import make_characters
+from werewolf.tests.factories import create_classic_game, make_characters
 
 pytestmark = pytest.mark.django_db
 
@@ -16,7 +15,7 @@ def client():
 @pytest.fixture
 def game():
     make_characters(7)
-    return create_game(seed=2, published=True)
+    return create_classic_game(seed=2, published=True)
 
 
 def test_game_list_newest_first_and_shape(client, game):
@@ -94,7 +93,7 @@ def test_notes(client, game):
 
 
 def test_unpublished_games_are_hidden(client, game):
-    hidden = create_game(seed=3)
+    hidden = create_classic_game(seed=3)
     assert hidden.published is False
     ids = [g["id"] for g in client.get("/api/werewolf/games/").json()]
     assert ids == [game.id]

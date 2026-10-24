@@ -4,8 +4,7 @@ import pytest
 
 from werewolf.engine import ScriptedProvider, run_day
 from werewolf.models import Game, GameEvent, PlayerNotes
-from werewolf.setup import create_game
-from werewolf.tests.factories import make_characters
+from werewolf.tests.factories import create_classic_game, make_characters
 from werewolf.tests.helpers import CapturingProvider, events_of, normalised_log
 
 pytestmark = pytest.mark.django_db
@@ -42,7 +41,7 @@ def allowed(event, player):
 @pytest.mark.parametrize("seed", range(10))
 def test_visibility_property(seed):
     make_characters(7)
-    game = create_game(seed=seed)
+    game = create_classic_game(seed=seed)
     capture = CapturingProvider(ScriptedProvider(game))
     play_to_end(game, capture)
 
@@ -78,7 +77,7 @@ def test_visibility_property(seed):
 @pytest.mark.parametrize("seed", [1, 2, 3])
 def test_end_to_end_note_canaries_never_leak(seed):
     make_characters(7)
-    game = create_game(seed=seed)
+    game = create_classic_game(seed=seed)
     capture = CapturingProvider(ScriptedProvider(game))
     play_to_end(game, capture)
 
@@ -99,7 +98,7 @@ def test_end_to_end_note_canaries_never_leak(seed):
 
 def test_moderator_prompts_never_contain_wolf_chat():
     make_characters(7)
-    game = create_game(seed=6)
+    game = create_classic_game(seed=6)
     capture = CapturingProvider(ScriptedProvider(game))
     play_to_end(game, capture)
     wolf_tokens = [
@@ -113,7 +112,7 @@ def test_moderator_prompts_never_contain_wolf_chat():
 
 def test_log_window_day_two_prompts_have_no_day_one_events():
     make_characters(7)
-    game = create_game(seed=3)
+    game = create_classic_game(seed=3)
     capture = CapturingProvider(ScriptedProvider(game))
     run_day(game, capture)
     game.refresh_from_db()
@@ -146,9 +145,9 @@ def test_replay_reproduces_event_log():
     from werewolf.turns import recorded_responses
 
     make_characters(7)
-    game1 = create_game(seed=12)
+    game1 = create_classic_game(seed=12)
     play_to_end(game1, ScriptedProvider(game1))
-    game2 = create_game(seed=12)
+    game2 = create_classic_game(seed=12)
 
     agent = ReplayAgent(recorded_responses(game1))
 

@@ -5,8 +5,7 @@ from django.test.utils import CaptureQueriesContext
 from werewolf.events import append_event
 from werewolf.models import ENGINE, PUBLIC, WOLF_CHAT, Player, player_visibility
 from werewolf.notes import append_note
-from werewolf.setup import create_game
-from werewolf.tests.factories import make_characters
+from werewolf.tests.factories import create_classic_game, make_characters
 from werewolf.visibility import (
     VisibleEvent,
     build_roster,
@@ -20,7 +19,7 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def game():
     make_characters()
-    return create_game(seed=3)
+    return create_classic_game(seed=3)
 
 
 def by_role(game, role):
@@ -197,7 +196,7 @@ def test_payload_conversion(game):
 
 def test_death_role_dropped_when_flag_off():
     make_characters()
-    g = create_game(seed=4, config={"reveal_role_on_death": False})
+    g = create_classic_game(seed=4, config={"reveal_role_on_death": False})
     v = g.players.filter(role="villager").first()
     append_event(
         g,
@@ -246,7 +245,7 @@ def test_roster_reveals(game):
 
 def test_roster_hides_role_when_flag_off():
     make_characters()
-    g = create_game(seed=4, config={"reveal_role_on_death": False})
+    g = create_classic_game(seed=4, config={"reveal_role_on_death": False})
     a, b = g.players.all()[:2]
     Player.objects.filter(pk=b.pk).update(alive=False)
     entry = next(r for r in build_roster(a) if r.name == b.name)
@@ -258,7 +257,7 @@ def test_own_role_info(game):
     info = own_role_info(w1)
     assert info["role"] == "wolf"
     assert info["wolf_label"] == w1.wolf_label
-    assert info["teammate_name"] == w2.name
+    assert info["teammates"] == [{"name": w2.name, "label": w2.wolf_label}]
     assert own_role_info(seer(game))["role"] == "seer"
 
 

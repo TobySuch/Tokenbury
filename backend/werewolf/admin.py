@@ -14,7 +14,7 @@ from werewolf.models import (
     Player,
     PlayerNotes,
 )
-from werewolf.setup import PLAYER_COUNT, create_game
+from werewolf.setup import create_game
 
 
 @admin.register(Character)
@@ -62,10 +62,14 @@ class GameCreationForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        config = cleaned.get("config")
+        if config is None:
+            return cleaned  # config already failed validation
+        needed = config["player_count"]
         count = Character.objects.count()
-        if count < PLAYER_COUNT:
+        if count < needed:
             raise forms.ValidationError(
-                f"A game needs {PLAYER_COUNT} characters but only {count} exist. "
+                f"A game needs {needed} characters but only {count} exist. "
                 "Add more, or run `manage.py seed_werewolf_characters`."
             )
         return cleaned

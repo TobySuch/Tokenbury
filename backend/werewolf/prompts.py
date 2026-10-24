@@ -22,8 +22,7 @@ class PlayerView:
     talkativeness: int
     win_condition: str
     wolf_label: str | None
-    teammate_name: str | None
-    teammate_label: str | None
+    teammates: tuple[tuple[str, str], ...] = ()  # (name, label) of fellow wolves
 
 
 @dataclass(frozen=True)
@@ -72,7 +71,8 @@ said what, who you suspect and why, vote results, and what the dead revealed.
 - Wolves may lie. Villagers should expect lies."""
 
 WOLF_GUIDANCE = (
-    "- In wolf chat, do not name yourself or your teammate. Use Wolf A and Wolf B."
+    "- In wolf chat, do not name yourself or your teammates. Use only the wolf "
+    "labels (Wolf A, Wolf B and so on)."
 )
 SEER_GUIDANCE = (
     "- You cannot speak at night. Work out who the wolves are from how they talk."
@@ -113,8 +113,7 @@ def player_view(player) -> PlayerView:
         talkativeness=player.character.talkativeness,
         win_condition=info.get("win_condition", ""),
         wolf_label=info.get("wolf_label"),
-        teammate_name=info.get("teammate_name"),
-        teammate_label=info.get("teammate_label"),
+        teammates=tuple((t["name"], t["label"]) for t in info.get("teammates", [])),
     )
 
 
@@ -126,10 +125,12 @@ def _role_section(view: PlayerView) -> str:
         f"Your win condition: {view.win_condition}",
     ]
     if view.role == "wolf":
-        parts.append(
-            f"You are {view.wolf_label}. Your teammate is {view.teammate_name} "
-            f"({view.teammate_label})."
-        )
+        mates = [f"{name} ({label})" for name, label in view.teammates]
+        if len(mates) == 1:
+            team = f"Your teammate is {mates[0]}."
+        else:
+            team = f"Your teammates are {', '.join(mates[:-1])} and {mates[-1]}."
+        parts.append(f"You are {view.wolf_label}. {team}")
         parts.append(WOLF_GUIDANCE)
     elif view.role == "seer":
         parts.append(SEER_GUIDANCE)

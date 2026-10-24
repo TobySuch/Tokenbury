@@ -5,7 +5,11 @@ ids to names on the way out to prompts.
 
 - wolf_message: {message, kill_target_id|null}   (wolf_chat, actor=wolf)
 - wolf_target: {target_id, source: "agreed"|"engine_random"}   (wolf_chat, no actor)
-- death: {player_id, cause: "night_kill"|"vote", role: str|null}   (public)
+- death: {player_id, cause: "night_kill"|"vote"|"heartbreak", role: str|null}   (public)
+- protect: {target_id}   (player:<doctor>, actor=doctor)
+- save_result: {saved: bool}   (player:<doctor>, no actor)
+- peaceful_night: {}   (public; the wolves' target was protected)
+- lover_message: {message}   (lovers, actor=lover)
 - speech: {message}   (public, actor=speaker)
 - pass: {phase}   (engine, actor)
 - vote_cast: {target_id|null}   (engine, actor)
@@ -15,5 +19,7 @@ ids to names on the way out to prompts.
 - phase_change: {from, to}   (engine)
 - game_over: {winner}   (public)
 - notes_turn_done: {phase}   (engine, actor)
-- role_assigned: as written by setup.py   (player:<id>)
+- role_assigned: {role, win_condition, wolf_label?, teammates?: [{name, label}],
+  lover_name?, lovers_note?}   (player:<id>; wolves get wolf_label and teammates,
+  lovers get lover_name (never the partner's role) and lovers_note)
 """

@@ -6,8 +6,7 @@ from werewolf.beats import build_beats
 from werewolf.engine import ScriptedProvider, run_day
 from werewolf.events import append_event
 from werewolf.models import ENGINE, PUBLIC, WOLF_CHAT, Game, GameEvent
-from werewolf.setup import create_game
-from werewolf.tests.factories import make_characters
+from werewolf.tests.factories import create_classic_game, make_characters
 
 pytestmark = pytest.mark.django_db
 
@@ -20,7 +19,7 @@ KEYS = {
 
 def new_game(seed=3):
     make_characters(7)
-    return create_game(seed=seed)
+    return create_classic_game(seed=seed)
 
 
 def ev(game, type, vis, day, phase, actor=None, **payload):
