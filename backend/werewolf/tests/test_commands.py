@@ -18,7 +18,22 @@ def media(settings, tmp_path, monkeypatch):
     )
 
 
-def test_seed_creates_seven_idempotently(db):
+@pytest.fixture
+def media_root(tmp_path, settings):
+    """Isolated MEDIA_ROOT so tests never depend on (or write to) the real media/."""
+    settings.MEDIA_ROOT = tmp_path
+    return tmp_path
+
+
+def _make_sprites(media_root, n=2):
+    sprites = media_root / "sprites"
+    sprites.mkdir()
+    for i in range(n):
+        (sprites / f"sprite{i}.png").write_bytes(b"\x89PNG fake")
+
+
+def test_seed_creates_seven_idempotently(db, media_root):
+    _make_sprites(media_root)
     call_command("seed_werewolf_characters")
     assert Character.objects.count() == 7
     call_command("seed_werewolf_characters")
@@ -26,6 +41,13 @@ def test_seed_creates_seven_idempotently(db):
     talk = {c.talkativeness for c in Character.objects.all()}
     assert len(talk) >= 4 and all(1 <= t <= 5 for t in talk)
     assert all(c.avatar for c in Character.objects.all())
+    assert all((media_root / c.avatar.name).exists() for c in Character.objects.all())
+
+
+def test_seed_without_sprites_creates_characters_without_avatars(db, media_root):
+    call_command("seed_werewolf_characters")
+    assert Character.objects.count() == 7
+    assert not any(c.avatar for c in Character.objects.all())
 
 
 def test_create_game_command(db):

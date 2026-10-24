@@ -21,7 +21,7 @@ class Command(BaseCommand):
     help = "Create the werewolf cast (idempotent)."
 
     def handle(self, *args, **options):
-        sprites = sorted((Path(settings.BASE_DIR) / "media" / "sprites").glob("*.png"))
+        sprites = sorted((Path(settings.MEDIA_ROOT) / "sprites").glob("*.png"))
         created = 0
         for i, (name, talk) in enumerate(CAST):
             if Character.objects.filter(name=name).exists():
