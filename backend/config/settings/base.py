@@ -69,6 +69,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 LLM_MODEL = os.environ.get("LLM_MODEL", "anthropic/claude-haiku-4-5")
 WEREWOLF_LLM_MODEL = os.environ.get("WEREWOLF_LLM_MODEL", "anthropic/claude-haiku-5.5")
+WEREWOLF_RUN_HOUR = int(os.environ.get("WEREWOLF_RUN_HOUR", "9"))
 TICK_INTERVAL_MINUTES = int(os.environ.get("TICK_INTERVAL_MINUTES", "15"))
 PLAN_HOUR = int(os.environ.get("PLAN_HOUR", "6"))
 API_HIDE_FUTURE_TICKS = (

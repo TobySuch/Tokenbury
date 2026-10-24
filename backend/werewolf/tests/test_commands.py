@@ -1,7 +1,11 @@
+import datetime
+
 import pytest
 from django.core.management import CommandError, call_command
+from django.utils import timezone
 
-from werewolf.models import Character, Game
+from werewolf.models import AgentCall, Character, Game, GameEvent
+from werewolf.setup import create_game
 from werewolf.tests.factories import make_characters
 
 
@@ -40,3 +44,101 @@ def test_create_game_command_bad_config(db):
 def test_create_game_command_too_few_characters(db):
     with pytest.raises(CommandError):
         call_command("create_werewolf_game")
+
+
+# ------------------------------------------------------------- run_day
+
+RUN_DAY = "werewolf.management.commands.run_day"
+
+
+def at_hour(monkeypatch, hour, day=None):
+    base = timezone.localtime().replace(hour=hour, minute=0, second=0, microsecond=0)
+    if day:
+        base = base.replace(day=day)
+    monkeypatch.setattr(f"{RUN_DAY}.now_local", lambda: base)
+    return base
+
+
+def test_run_day_scripted_until_over_finishes_game(db, capsys):
+    make_characters(7)
+    game = create_game(seed=7)
+    call_command("run_day", "--scripted", "--until-over")
+    game.refresh_from_db()
+    assert game.status == "finished"
+    assert game.winner in {"wolves", "town", "draw"}
+    out = capsys.readouterr().out
+    assert "Winner" in out and game.winner in out
+    assert "calls" in out.lower()
+
+
+def test_run_day_plays_one_day_by_default_on_latest_active(db):
+    make_characters(7)
+    old = create_game(seed=1)
+    old.status = "finished"
+    old.save()
+    game = create_game(seed=2)
+    call_command("run_day", "--scripted")
+    game.refresh_from_db()
+    assert game.day_number == 2 and game.phase == "night_wolf_chat"
+    old.refresh_from_db()
+    assert not GameEvent.objects.filter(game=old, type="wolf_message").exists()
+
+
+def test_run_day_game_option(db):
+    make_characters(7)
+    first = create_game(seed=1)
+    create_game(seed=2)
+    call_command("run_day", "--scripted", "--game", str(first.pk))
+    first.refresh_from_db()
+    assert first.day_number == 2
+
+
+def test_run_day_unknown_game(db):
+    with pytest.raises(CommandError):
+        call_command("run_day", "--scripted", "--game", "999")
+
+
+def test_run_day_without_active_game_is_not_an_error(db, capsys):
+    call_command("run_day", "--scripted")
+    assert "no active game" in capsys.readouterr().out.lower()
+
+
+def test_if_due_skips_before_run_hour(db, monkeypatch, settings):
+    settings.WEREWOLF_RUN_HOUR = 9
+    make_characters(7)
+    game = create_game(seed=3)
+    at_hour(monkeypatch, 8)
+    call_command("run_day", "--scripted", "--if-due")
+    game.refresh_from_db()
+    assert game.day_number == 1 and not AgentCall.objects.exists()
+
+
+def test_if_due_runs_after_hour_then_skips_when_already_run_today(
+    db, monkeypatch, settings, capsys
+):
+    settings.WEREWOLF_RUN_HOUR = 9
+    make_characters(7)
+    game = create_game(seed=3)
+    at_hour(monkeypatch, 10)
+    call_command("run_day", "--scripted", "--if-due")
+    game.refresh_from_db()
+    assert game.day_number == 2
+    calls = AgentCall.objects.count()
+    call_command("run_day", "--scripted", "--if-due")
+    game.refresh_from_db()
+    assert game.day_number == 2 and AgentCall.objects.count() == calls
+    assert "already" in capsys.readouterr().out.lower()
+
+
+def test_if_due_runs_again_next_day(db, monkeypatch, settings):
+    settings.WEREWOLF_RUN_HOUR = 9
+    make_characters(7)
+    game = create_game(seed=3)
+    now = at_hour(monkeypatch, 10)
+    call_command("run_day", "--scripted", "--if-due")
+    GameEvent.objects.filter(game=game).update(
+        created_at=now - datetime.timedelta(days=1)
+    )
+    call_command("run_day", "--scripted", "--if-due")
+    game.refresh_from_db()
+    assert game.day_number == 3 or game.status == "finished"
