@@ -185,7 +185,7 @@ cd frontend && bun run test
 
 ## Werewolf
 
-A separate game app (`backend/werewolf/`, frontend at `/werewolf` in `frontend/src/werewolf/`). It shares no models with the live sim. Visibility is structural: every agent prompt goes through `werewolf.visibility.events_visible_to` + that player's notes — never add another path from game state to a prompt.
+A separate game app (`backend/werewolf/`, frontend at `/werewolf` in `frontend/src/werewolf/`). It shares no models with the live sim. Visibility is structural: agent prompts are built only from `werewolf.visibility.events_visible_to(player)`, that player's own notes, their own PlayerView, and the public roster (names, alive/dead, and roles of the dead only when `reveal_role_on_death` is on) — never add another path from game state to a prompt.
 
 ```bash
 make werewolf-game ARGS="--seed 7"            # create a game (run seed_werewolf_characters first)

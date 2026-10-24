@@ -12,7 +12,7 @@ from werewolf.config import game_config
 from werewolf.events import append_event
 from werewolf.models import ENGINE, PUBLIC, Game, GameEvent, Player
 from werewolf.rng import rng_for
-from werewolf.tools import function_tool
+from werewolf.tools import function_tool, match_name
 from werewolf.turns import check_budget, log_call
 
 PICK_TOOL = "pick_speaker"
@@ -197,6 +197,8 @@ def moderator_prompt_for(game: Game, state: DiscussionState) -> list[dict]:
 
 def fallback_pick(game: Game, state: DiscussionState, eligible: list[Player]) -> Player:
     rng = rng_for(game, "moderator", str(game.day_number), str(len(state.picks)))
+    # Prefer players who haven't just declined, unless that leaves nobody.
+    eligible = [p for p in eligible if p.id not in state.declined] or eligible
     weights = [p.character.talkativeness for p in eligible]
     return rng.choices(eligible, weights=weights, k=1)[0]
 
@@ -225,12 +227,8 @@ def _interpret(call, eligible, state, min_messages) -> tuple[dict | None, str]:
     )
     if call.name == PICK_TOOL:
         name = args.get("name")
-        match = None
-        if isinstance(name, str):
-            match = next(
-                (p for p in eligible if p.name.lower() == name.strip().lower()), None
-            )
-        if match is None:
+        match = match_name(name, eligible, key=lambda p: p.name)
+        if match is None or match.id in state.declined:
             return None, f"invalid pick {name!r}"
         return {
             "pick_id": match.id,

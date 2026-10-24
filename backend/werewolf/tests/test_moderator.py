@@ -420,3 +420,31 @@ def test_moderator_view_has_no_secrets(game):
     assert "public line one" in text
     assert "my reason" in text
     assert ps[1].name in text  # declined
+
+
+# ---- declined players ----
+
+
+def test_fallback_pick_skips_players_who_declined(game):
+    a, b = players(game)[:2]
+    for n in range(20):
+        state = discussion_state(game)
+        state.declined = [a.id]
+        state.picks = [{}] * n
+        assert fallback_pick(game, state, [a, b]) == b
+
+
+def test_fallback_pick_uses_declined_when_nobody_else_is_left(game):
+    a = players(game)[0]
+    state = discussion_state(game)
+    state.declined = [a.id]
+    assert fallback_pick(game, state, [a]) == a
+
+
+def test_llm_pick_of_declined_player_falls_back(game):
+    ps = players(game)
+    do_pass(game, ps[1])
+    moderate(game, agent_of(pick(ps[1].name)), discussion_state(game))
+    (event,) = picks_events(game)
+    assert event.payload["source"] == "fallback"
+    assert event.payload["pick_id"] != ps[1].id

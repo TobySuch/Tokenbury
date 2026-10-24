@@ -32,6 +32,14 @@ export function useBeats(gameId) {
   useEffect(() => {
     if (!active) return undefined
     let cancelled = false
+    const merge = (fresh) => {
+      if (fresh.length === 0) return
+      setBeats((prev) => {
+        const last = prev.length ? prev[prev.length - 1].index : -1
+        const added = fresh.filter((b) => b.index > last)
+        return added.length ? [...prev, ...added] : prev
+      })
+    }
     const id = setInterval(async () => {
       const [g, fresh] = await Promise.all([
         fetchGame(gameId),
@@ -39,12 +47,13 @@ export function useBeats(gameId) {
       ])
       if (cancelled) return
       if (g) setGame(g)
-      if (fresh.length > 0) {
-        setBeats((prev) => {
-          const last = prev.length ? prev[prev.length - 1].index : -1
-          const added = fresh.filter((b) => b.index > last)
-          return added.length ? [...prev, ...added] : prev
-        })
+      merge(fresh)
+      if (g && g.status !== 'active') {
+        // The game and beats requests race: once the game has ended, take one
+        // last look so the final beats (death / game_over) are not missed.
+        const after = fresh.length ? fresh[fresh.length - 1].index : lastIndex.current
+        const rest = await fetchBeats(gameId, after)
+        if (!cancelled) merge(rest)
       }
     }, POLL_MS)
     return () => {

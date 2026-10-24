@@ -89,11 +89,12 @@ class ValidationContext:
     actor_name: str = ""
 
 
-def _match(name, candidates):
+def match_name(name, candidates, key=str):
+    """Return the candidate whose key matches name (strip + casefold), else None."""
     if not isinstance(name, str):
         return None
-    lowered = name.strip().lower()
-    return next((c for c in candidates if c.lower() == lowered), None)
+    wanted = name.strip().casefold()
+    return next((c for c in candidates if key(c).casefold() == wanted), None)
 
 
 def _text_error(args, key, label):
@@ -118,7 +119,7 @@ def _validate_speak(args, ctx):
         if re.search(rf"\b{re.escape(name)}\b", message, re.IGNORECASE):
             return "Do not name wolves; use Wolf A / Wolf B."
     target = args.get("kill_target")
-    if target is not None and _match(target, ctx.living_non_wolf_names) is None:
+    if target is not None and match_name(target, ctx.living_non_wolf_names) is None:
         return "kill_target must be the name of a living non-wolf player."
     return None
 
@@ -127,10 +128,10 @@ def _validate_vote(args, ctx):
     target = args.get("target")
     if not isinstance(target, str) or not target.strip():
         return "'target' must be a player's name or 'none'."
-    if target.strip().lower() == "none":
+    if target.strip().casefold() == "none":
         return None
-    others = [n for n in ctx.living_names if n.lower() != ctx.actor_name.lower()]
-    if _match(target, others) is None:
+    others = [n for n in ctx.living_names if n.casefold() != ctx.actor_name.casefold()]
+    if match_name(target, others) is None:
         return "target must be a living player other than yourself, or 'none'."
     return None
 

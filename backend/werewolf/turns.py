@@ -137,6 +137,7 @@ def run_turn(
     max_notes = game_config(game)["max_note_calls_per_turn"]
     messages = list(messages)
     note_calls = 0
+    appended: set[str] = set()
 
     for _attempt in range(MAX_RETRIES + 1):
         check_budget(game)
@@ -149,22 +150,35 @@ def run_turn(
         log_call(game, player, messages, resp, (time.monotonic() - started) * 1000)
 
         results = []
+        # Pass 1: every note call is processed, whatever its position relative
+        # to the terminal call. Pass 2: terminal calls are validated in order.
         for call in resp.tool_calls:
             if call.arguments is None:
                 results.append((call, "Error: arguments must be a JSON object."))
                 continue
-            is_note = call.name in NOTE_TOOLS
-            if is_note:
-                note_calls += 1
+            if call.name not in NOTE_TOOLS:
+                continue
+            note_calls += 1
             error = validate_tool_call(call.name, call.arguments, ctx)
-            if error is None and is_note and note_calls > max_notes:
+            if error is None and note_calls > max_notes:
                 error = "note call limit reached"
+            if error:
+                results.append((call, f"Error: {error}"))
+            elif call.name == "append_note" and call.arguments["text"] in appended:
+                # A resent note still counts toward the limit but is not rewritten.
+                results.append((call, "Note already saved this turn."))
+            else:
+                if call.name == "append_note":
+                    appended.add(call.arguments["text"])
+                results.append((call, _run_note(player, call)))
+        for call in resp.tool_calls:
+            if call.arguments is None or call.name in NOTE_TOOLS:
+                continue
+            error = validate_tool_call(call.name, call.arguments, ctx)
             if error:
                 results.append((call, f"Error: {error}"))
             elif call.name in TERMINAL_TOOLS:
                 return TurnResult(call.name, call.arguments, fallback=False)
-            else:
-                results.append((call, _run_note(player, call)))
 
         messages.append(resp.raw)
         messages.extend(

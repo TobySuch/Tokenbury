@@ -92,11 +92,45 @@ def test_notes_then_speak_in_one_response(game):
     assert PlayerNotes.objects.get(player=p).version == 1
 
 
-def test_terminal_ends_turn_and_ignores_later_calls(game):
+def test_notes_after_terminal_call_are_still_saved(game):
     p = villager(game)
     result = run(game, p, [[PASS, ("append_note", {"text": "late"})]])
     assert result.action == "pass"
-    assert current_notes(p) == ""
+    assert current_notes(p) == "late"
+
+
+def test_notes_around_invalid_terminal_are_all_saved(game):
+    p = villager(game)
+    script = [
+        [BAD_SPEAK, ("append_note", {"text": "after"})],
+        [("append_note", {"text": "before"}), SPEAK],
+    ]
+    result = run(game, p, script)
+    assert result.action == "speak"
+    assert current_notes(p) == "after\nbefore"
+
+
+def test_duplicate_append_note_in_one_turn_is_not_rewritten(game):
+    p = villager(game)
+    note = ("append_note", {"text": "same"})
+    result = run(game, p, [[note, BAD_SPEAK], [note, SPEAK]])
+    assert result.action == "speak"
+    assert current_notes(p) == "same"
+    assert PlayerNotes.objects.get(player=p).version == 1
+
+
+def test_duplicate_append_note_reports_already_saved(game):
+    p = villager(game)
+    note = ("append_note", {"text": "same"})
+    seen = []
+
+    def script(messages, tools):
+        seen.append(list(messages))
+        return [note, BAD_SPEAK] if len(seen) < 3 else [SPEAK]
+
+    run(game, p, script)
+    tool_texts = [m["content"] for m in seen[2] if m["role"] == "tool"]
+    assert any("already saved" in t for t in tool_texts)
 
 
 def test_note_call_limit(game):
@@ -114,9 +148,9 @@ def test_note_limit_error_text_and_counts_across_retries(game):
     def script(messages, tools):
         seen.append(messages)
         if len(seen) == 1:
-            return [("append_note", {"text": "a"})] * 3
+            return [("append_note", {"text": f"a{i}"}) for i in range(3)]
         if len(seen) == 2:
-            return [("append_note", {"text": "b"})] * 2
+            return [("append_note", {"text": f"b{i}"}) for i in range(2)]
         return [SPEAK]
 
     run(game, p, script)

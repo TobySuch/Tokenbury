@@ -23,7 +23,7 @@ from werewolf.moderator import (
 )
 from werewolf.prompts import Turn, build_prompt_for
 from werewolf.rng import rng_for
-from werewolf.tools import ValidationContext, tools_for
+from werewolf.tools import ValidationContext, match_name, tools_for
 from werewolf.turns import BudgetExceeded, TurnResult, run_turn
 
 Phase = Game.Phase
@@ -187,10 +187,7 @@ def _living(game: Game) -> list[Player]:
 
 
 def _resolve(name, candidates):
-    if not isinstance(name, str):
-        return None
-    wanted = name.strip().lower()
-    return next((p for p in candidates if p.name.lower() == wanted), None)
+    return match_name(name, candidates, key=lambda p: p.name)
 
 
 def _play(game, provider, player, kind, extra="") -> TurnResult:
@@ -294,7 +291,10 @@ def _check_win(game: Game) -> bool:
 
 
 def _agreed_target(wolves, messages) -> int | None:
-    latest = {m.actor_id: m.payload.get("kill_target_id") for m in messages}
+    latest = {}
+    for m in messages:
+        if m.payload.get("kill_target_id") is not None:
+            latest[m.actor_id] = m.payload["kill_target_id"]
     targets = {latest.get(w.id) for w in wolves}
     if len(targets) == 1 and None not in targets:
         return targets.pop()

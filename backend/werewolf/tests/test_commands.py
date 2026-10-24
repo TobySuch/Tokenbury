@@ -10,8 +10,12 @@ from werewolf.tests.factories import make_characters
 
 
 @pytest.fixture(autouse=True)
-def media(settings, tmp_path):
+def media(settings, tmp_path, monkeypatch):
     settings.MEDIA_ROOT = tmp_path
+    # Isolate from a real run_day holding the global lock.
+    monkeypatch.setattr(
+        "werewolf.management.commands.run_day.LOCK_FILE", str(tmp_path / "lock")
+    )
 
 
 def test_seed_creates_seven_idempotently(db):

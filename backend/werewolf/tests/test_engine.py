@@ -5,6 +5,7 @@ from werewolf.agents import LLMAgent
 from werewolf.engine import (
     LLMProvider,
     ScriptedProvider,
+    _agreed_target,
     run_day,
     validation_context,
 )
@@ -497,3 +498,17 @@ def test_llm_errors_fall_back_not_crash():
     game = fresh(game)
     assert game.status == "active" and game.day_number == 2
     assert events_of(game, type="wolf_target")[0].payload["source"] == "engine_random"
+
+
+def test_agreed_target_ignores_messages_without_a_target():
+    from types import SimpleNamespace as NS
+
+    wolves = [NS(id=1), NS(id=2)]
+
+    def msg(actor, target):
+        return NS(actor_id=actor, payload={"kill_target_id": target})
+
+    messages = [msg(1, 7), msg(2, 7), msg(1, None)]
+    assert _agreed_target(wolves, messages) == 7
+    assert _agreed_target(wolves, [msg(1, 7), msg(2, 8), msg(1, None)]) is None
+    assert _agreed_target(wolves, [msg(1, None), msg(2, 7)]) is None
