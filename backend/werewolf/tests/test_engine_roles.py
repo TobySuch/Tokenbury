@@ -495,3 +495,23 @@ def test_full_default_games_finish_with_a_winner(players, seed):
     game = fresh(game)
     assert game.status == "finished"
     assert game.winner in {"wolves", "town", "lovers", "draw"}
+
+
+def test_no_wolf_target_means_no_save_result():
+    from werewolf.engine import _morning
+    from werewolf.events import append_event
+
+    game = new_game()
+    doctor = by_role(game, "doctor")[0]
+    villager = by_role(game, "villager")[0]
+    append_event(
+        game,
+        type="protect",
+        visibility=f"player:{doctor.id}",
+        day=1,
+        phase="night_doctor",
+        actor=doctor,
+        payload={"target_id": villager.id},
+    )
+    _morning(game, ScriptedProvider(game))
+    assert events_of(game, type="save_result") == []

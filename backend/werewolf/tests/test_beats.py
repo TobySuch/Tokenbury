@@ -296,3 +296,12 @@ def test_scripted_full_default_game():
             assert shrunk == {cur["victim_id"]}
         else:
             assert not shrunk
+
+
+def test_unknown_death_cause_is_a_generic_day_beat():
+    game = new_game()
+    victim = game.players.exclude(role="wolf").first()
+    ev(game, "death", PUBLIC, 1, "morning", player_id=victim.id, cause="plague")
+    beat = next(b for b in build_beats(game) if b["victim_id"] == victim.id)
+    assert beat["kind"] == "morning"
+    assert beat["text"] == f"{victim.name} died."

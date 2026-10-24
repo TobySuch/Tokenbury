@@ -67,10 +67,22 @@ test('protect beat lights only the doctor and marks the protected seat', () => {
       text: 'The doctor protects P4.',
     })
   )
-  expect(dimmed(3)).toBe('false')
-  for (const id of [1, 2, 4, 5, 6]) expect(dimmed(id)).toBe('true')
+  for (const id of [3, 4]) expect(dimmed(id)).toBe('false')
+  for (const id of [1, 2, 5, 6]) expect(dimmed(id)).toBe('true')
   expect(within(screen.getByTestId('seat-4')).getByTestId('shield-mark')).toBeInTheDocument()
   expect(screen.queryAllByTestId('shield-mark')).toHaveLength(1)
+})
+
+test('shield and listening marks sit at different corners', () => {
+  renderCircle(
+    makePlayers(),
+    beat({ kind: 'protect', palette: 'night', actor_id: 3, target_id: 2, text: 'x' })
+  )
+  const seat = within(screen.getByTestId('seat-2'))
+  const shield = seat.getByTestId('shield-mark').getAttribute('class')
+  const listening = seat.getByTitle('Listening').parentElement.getAttribute('class')
+  expect(shield).not.toMatch(/-right-1 -top-1/)
+  expect(listening).toMatch(/-right-1 -top-1/)
 })
 
 test('lovers always carry a heart marker', () => {

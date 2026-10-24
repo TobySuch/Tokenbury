@@ -514,7 +514,7 @@ def _morning(game, provider) -> None:
         and protect
         and protect.payload["target_id"] == target.payload["target_id"]
     )
-    if protect and not _today(game, type="save_result").exists():
+    if target and protect and not _today(game, type="save_result").exists():
         append_event(
             game,
             type="save_result",

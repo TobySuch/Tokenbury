@@ -95,5 +95,22 @@ def role_counts(config: dict) -> dict[str, int]:
     return counts
 
 
+LEGACY_OVERRIDES = {"doctor_count": 0, "lovers": False}
+
+
+def game_rules(game) -> tuple[dict, dict[str, int]]:
+    """The game's validated config and its role mix, computed once."""
+    overrides = dict(game.config)
+    if "player_count" not in overrides:
+        # Created before doctor, lovers and variable sizes existed: keep the
+        # original rules and the actual number of players.
+        overrides = {**LEGACY_OVERRIDES, **overrides}
+        players = game.players.count()
+        if MIN_PLAYERS <= players <= MAX_PLAYERS:
+            overrides["player_count"] = players
+    config = build_config(overrides)
+    return config, role_counts(config)
+
+
 def game_config(game) -> dict:
-    return build_config(game.config)
+    return game_rules(game)[0]
