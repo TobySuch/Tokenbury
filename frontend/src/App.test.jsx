@@ -148,3 +148,14 @@ test('About links point at the town about page on the town site', async () => {
   expect(abouts.length).toBe(2)
   abouts.forEach((l) => expect(l).toHaveAttribute('href', '/about'))
 })
+
+test('the werewolf about page describes the current roles and variable player count', async () => {
+  await renderAt('/werewolf/about')
+  const main = screen.getByRole('main')
+  expect(main).toHaveTextContent(/doctor/i)
+  expect(main).toHaveTextContent(/lovers/i)
+  expect(main).toHaveTextContent(/broken heart/i)
+  expect(main).toHaveTextContent(/between five and twelve/i)
+  expect(main).not.toHaveTextContent(/seven players/i)
+  expect(main).not.toHaveTextContent(/the two wolves/i)
+})
