@@ -2,6 +2,7 @@ import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import Home from './pages/Home'
 import About from './pages/About'
 import WerewolfPage from './werewolf/WerewolfPage'
+import WerewolfAbout from './werewolf/WerewolfAbout'
 import Banner from './components/Banner'
 import BottomNav from './components/BottomNav'
 import Footer from './components/Footer'
@@ -55,7 +56,7 @@ function App() {
         )}
         <nav className="ml-auto flex gap-2 pr-4">
           <NavLink
-            to="/about"
+            to={onWerewolf ? '/werewolf/about' : '/about'}
             className={({ isActive }) =>
               `rounded-lg border border-[#d4bc8a] px-4 py-2 font-semibold transition-colors hover:bg-[#f0e6c8] ${
                 isActive ? 'bg-[#f0e6c8]' : 'bg-[#faf5e4]'
@@ -70,6 +71,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<About />} />
         <Route path="/werewolf" element={<WerewolfPage />} />
+        <Route path="/werewolf/about" element={<WerewolfAbout />} />
         <Route path="/werewolf/:gameId" element={<WerewolfPage />} />
       </Routes>
       <Footer />

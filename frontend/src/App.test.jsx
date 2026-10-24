@@ -112,3 +112,39 @@ test('header logos use the lightweight webp versions', async () => {
     .getAllByRole('img')
     .forEach((img) => expect(img.getAttribute('src')).toMatch(/\.webp$/))
 })
+
+async function renderAt(path) {
+  await act(async () => {
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <App />
+      </MemoryRouter>
+    )
+  })
+}
+
+test('/werewolf/about shows the werewolf about page, not a game', async () => {
+  await renderAt('/werewolf/about')
+  expect(screen.getByRole('heading', { name: 'About Tokenbury Werewolf' })).toBeInTheDocument()
+  expect(globalThis.fetch).not.toHaveBeenCalledWith(
+    expect.stringMatching(/\/api\/werewolf\/games\/about/)
+  )
+  // Still branded as the werewolf site.
+  expect(
+    within(screen.getByRole('banner')).getByRole('img', { name: 'Tokenbury Werewolf' })
+  ).toBeInTheDocument()
+})
+
+test('About links point at the werewolf about page on the werewolf site', async () => {
+  await renderAt('/werewolf')
+  const abouts = screen.getAllByRole('link', { name: 'About' })
+  expect(abouts.length).toBe(2)
+  abouts.forEach((l) => expect(l).toHaveAttribute('href', '/werewolf/about'))
+})
+
+test('About links point at the town about page on the town site', async () => {
+  await renderAt('/')
+  const abouts = screen.getAllByRole('link', { name: 'About' })
+  expect(abouts.length).toBe(2)
+  abouts.forEach((l) => expect(l).toHaveAttribute('href', '/about'))
+})
