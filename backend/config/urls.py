@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.urls import path
 from django.views.static import serve
+
 from world.views import (
     active_banner,
     active_instance,

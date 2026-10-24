@@ -1,6 +1,6 @@
 import os
 
-from .base import *  # noqa: F403
+from .base import *
 
 DEBUG = False
 
@@ -22,7 +22,7 @@ CSRF_TRUSTED_ORIGINS = [
     if o.strip()
 ]
 
-STATIC_ROOT = BASE_DIR / "staticfiles"  # noqa: F405
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 db_option = os.environ.get("DATABASE", "sqlite").lower()
 if db_option == "postgres":
@@ -35,7 +35,7 @@ if db_option == "postgres":
     for var in required:
         if not os.environ.get(var):
             raise ValueError(f"{var} environment variable not set.")
-    DATABASES = {  # noqa: F405
+    DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
             "NAME": os.environ["SQL_DATABASE"],

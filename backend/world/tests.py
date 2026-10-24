@@ -1,6 +1,8 @@
+from datetime import timedelta
+
 import pytest
 from django.utils import timezone as tz
-from datetime import timedelta
+
 from world.models import Agent, AgentTick, Banner, DailyPlan, Instance, Location, Tick
 
 
