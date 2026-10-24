@@ -57,6 +57,7 @@ function Spectator({ gameId, game, beats, players }) {
             player={focused}
             alive={focused ? aliveIds.has(focused.id) : false}
             seq={beat?.seq}
+            players={players}
           />
         </div>
         {beats.length === 0 ? (

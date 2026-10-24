@@ -30,6 +30,33 @@ function ListeningMark() {
   )
 }
 
+function HeartMark() {
+  return (
+    <span
+      data-testid="heart-mark"
+      role="img"
+      aria-label="In love"
+      className="absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-paper text-xs leading-none text-red-600"
+    >
+      ♥
+    </span>
+  )
+}
+
+function ShieldMark() {
+  return (
+    <svg
+      data-testid="shield-mark"
+      viewBox="0 0 24 24"
+      className="absolute -right-1 -top-1 h-5 w-5 rounded-full bg-paper p-0.5 text-emerald-600"
+      fill="currentColor"
+    >
+      <title>Protected</title>
+      <path d="M12 2 4 5v6c0 5 3.4 9.3 8 11 4.6-1.7 8-6 8-11V5l-8-3z" />
+    </svg>
+  )
+}
+
 function Avatar({ player, className }) {
   return player.avatar_url ? (
     <img src={player.avatar_url} alt="" className={`object-contain ${className}`} />
@@ -46,6 +73,7 @@ function Avatar({ player, className }) {
 const WINNER_TEXT = {
   wolves: 'The wolves win',
   town: 'The town wins',
+  lovers: 'The lovers win',
   draw: 'A draw: the game ran out of days',
 }
 
@@ -64,15 +92,23 @@ export default function PlayerCircle({
   onSelect,
 }) {
   const positions = seatPositions(players)
+  const compact = players.length >= 10
   const night = beat?.palette === 'night'
   const nameOf = Object.fromEntries(players.map((p) => [String(p.id), p.name]))
   const speakerId =
-    beat && (beat.kind === 'speech' || beat.kind === 'wolf_message') ? beat.actor_id : null
+    beat &&
+    (beat.kind === 'speech' || beat.kind === 'wolf_message' || beat.kind === 'lover_message')
+      ? beat.actor_id
+      : null
   const tally = beat?.kind === 'vote_reveal' && beat.tally ? Object.entries(beat.tally) : null
+
+  const loverIds = new Set(players.filter((p) => p.lover_id != null).map((p) => p.id))
 
   const isDimmed = (p) => {
     if (!beat) return false
     if (beat.kind === 'wolf_message') return p.id !== beat.actor_id
+    if (beat.kind === 'lover_message') return !loverIds.has(p.id)
+    if (beat.kind === 'protect') return p.id !== beat.actor_id
     return night && p.role !== 'wolf'
   }
 
@@ -90,9 +126,12 @@ export default function PlayerCircle({
           >
             {beat?.banner}
           </h2>
-          {beat?.text && beat.kind !== 'speech' && beat.kind !== 'wolf_message' && (
-            <p className="line-clamp-4 text-xs text-ink-soft sm:text-sm">{beat.text}</p>
-          )}
+          {beat?.text &&
+            beat.kind !== 'speech' &&
+            beat.kind !== 'wolf_message' &&
+            beat.kind !== 'lover_message' && (
+              <p className="line-clamp-4 text-xs text-ink-soft sm:text-sm">{beat.text}</p>
+            )}
           {beat?.kind === 'game_over' && (
             <p
               role="status"
@@ -116,8 +155,11 @@ export default function PlayerCircle({
               data-state={alive ? 'alive' : 'dead'}
               data-speaker={speaking ? 'true' : 'false'}
               data-dimmed={dimmed ? 'true' : 'false'}
+              data-compact={compact ? 'true' : 'false'}
               style={{ left: `${x}%`, top: `${y}%` }}
-              className={`absolute flex w-[4.5rem] -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-opacity duration-700 sm:w-24 ${
+              className={`absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-opacity duration-700 ${
+                compact ? 'w-14 sm:w-20' : 'w-[4.5rem] sm:w-24'
+              } ${
                 speaking ? 'z-30' : 'z-20'
               } ${!alive ? 'opacity-50' : dimmed ? 'opacity-35' : 'opacity-100'}`}
               onMouseEnter={() => onHover(p.id)}
@@ -135,9 +177,18 @@ export default function PlayerCircle({
                   speaking ? 'bg-accent text-accent-ink' : ''
                 } ${!alive ? 'border-2 border-dashed border-ink-muted' : ''}`}
               >
-                <Avatar player={p} className="h-14 w-11 text-lg sm:h-20 sm:w-14" />
+                <Avatar
+                  player={p}
+                  className={
+                    compact
+                      ? 'h-10 w-8 text-base sm:h-16 sm:w-12'
+                      : 'h-14 w-11 text-lg sm:h-20 sm:w-14'
+                  }
+                />
                 <span className="mt-0.5 max-w-full truncate text-xs font-semibold">{p.name}</span>
                 {night && p.role === 'seer' && alive && <ListeningMark />}
+                {beat?.kind === 'protect' && beat.target_id === p.id && <ShieldMark />}
+                {p.lover_id != null && <HeartMark />}
               </button>
               {!alive && (
                 <Pill tone={p.role} className="mt-0.5">
