@@ -491,13 +491,15 @@ def lover_view(role="villager", **kw):
 
 def test_doctor_section_only_for_the_doctor():
     d = text(build(doctor_view()))
-    assert "As the doctor" in d
-    assert "may protect yourself" in d
+    assert "Each night you may protect one living player" in d
+    assert "yourself included" in d
     assert "same player two nights running" in d
-    assert "told if" in d
+    assert "told privately whether your protection" in d
     for role in ("villager", "seer"):
-        assert "As the doctor" not in text(build(view(role)))
-    assert "As the doctor" not in text(
+        assert "Each night you may protect one living player" not in text(
+            build(view(role))
+        )
+    assert "Each night you may protect one living player" not in text(
         build(view("wolf", teammates=(("W", "Wolf B"),)))
     )
 
@@ -708,7 +710,7 @@ def test_leak_canaries_full_mix(config):
             assert ("You protected" in prompt) is is_doc
             assert ("Your protection did not" in prompt) is is_doc
             assert ("secretly in love" in prompt) is (p.id in lover_ids)
-            assert ("As the doctor" in prompt) is is_doc
+            assert ("Each night you may protect one living player" in prompt) is is_doc
             if p.lover_id:
                 section = prompt[prompt.index("You are secretly in love") :]
                 section = section.split("\n## ")[0].split("\n\n")[0]
@@ -778,3 +780,92 @@ def test_legacy_game_prompt_states_the_classic_rules():
     prompt = text(build_prompt_for(p, t_for("discussion")))
     assert "7 players: 2 wolves, 1 seer and 4 villagers" in prompt
     assert "lovers" not in prompt.lower()
+
+
+# --- Role abilities, audience and guidance (from reading live games) ---
+
+ABILITY_PHRASES = {
+    "wolf": "propose a kill target",
+    "seer": "you have no power to investigate or check anyone",
+    "doctor": "protect one living player",
+    "villager": "you have no night action",
+}
+
+
+@pytest.mark.parametrize("role", ["wolf", "seer", "doctor", "villager"])
+def test_every_role_gets_an_explicit_abilities_section(role):
+    extra = {"wolf_label": "Wolf A"} if role == "wolf" else {}
+    system = build(view(role=role, **extra))[0]["content"]
+    assert "## Your abilities" in system
+    section = system.split("## Your abilities", 1)[1].split("\n## ", 1)[0]
+    assert ABILITY_PHRASES[role] in section.lower()
+    assert "no other powers" in section.lower()
+    for other, phrase in ABILITY_PHRASES.items():
+        if other != role:
+            assert phrase not in section.lower()
+
+
+def test_lovers_are_warned_their_partner_may_be_on_the_other_side():
+    system = build(view(lover_name="Bob"))[0]["content"]
+    section = system.split("## Your abilities", 1)[1].split("\n## ", 1)[0]
+    assert "may be on the other side" in section
+
+
+@pytest.mark.parametrize(
+    "kind, phrase",
+    [
+        ("discussion", "everyone, including the wolves"),
+        ("wolf_chat", "the seer may be reading"),
+        ("lovers_chat", "only your partner"),
+    ],
+)
+def test_speaking_turns_say_who_will_read_the_message(kind, phrase):
+    instruction = build(t=turn(kind))[1]["content"]
+    assert phrase in instruction
+
+
+@pytest.mark.parametrize("kind", ["discussion", "wolf_chat", "lovers_chat"])
+def test_speaking_turns_keep_private_reasoning_out_of_speech(kind):
+    instruction = build(t=turn(kind))[1]["content"]
+    assert "only the words you say" in instruction.lower()
+    assert "private reasoning belongs in your notes" in instruction.lower()
+
+
+def test_general_guidance_forbids_inventing_events_and_explains_vote_attrition():
+    system = build()[0]["content"]
+    assert "never invent" in system.lower()
+    assert "first night" in system.lower()
+    assert "voting for no one" in system.lower()
+    assert "do not start your messages with your own name" in system.lower()
+
+
+def test_wolf_chat_instruction_handles_more_than_one_teammate():
+    instruction = build(
+        view(
+            role="wolf",
+            wolf_label="Wolf A",
+            teammates=(("B", "Wolf B"), ("C", "Wolf C")),
+        ),
+        t=turn("wolf_chat"),
+    )[1]["content"]
+    assert "your teammate." not in instruction
+    assert "every living wolf" in instruction
+
+
+def test_roster_order_is_shuffled_per_player_but_stable(game):
+    players = list(game.players.order_by("seat"))
+    t = turn("discussion")
+
+    def roster_names(p):
+        system = build_prompt_for(p, t)[0]["content"]
+        block = system.split("## Players\n", 1)[1].split("\n\n", 1)[0]
+        return [line[2:].split(" (")[0] for line in block.splitlines()]
+
+    orders = {p.pk: roster_names(p) for p in players}
+    for p in players:
+        assert sorted(orders[p.pk]) == sorted(q.name for q in players if q != p)
+        assert roster_names(p) == orders[p.pk]  # deterministic within the day
+    seat_orders = {p.pk: [q.name for q in players if q != p] for p in players}
+    assert any(orders[pk] != seat_orders[pk] for pk in orders)
+    # The first-listed name isn't the same seat for everyone.
+    assert len({orders[p.pk][0] for p in players}) > 1

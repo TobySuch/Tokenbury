@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 from werewolf.config import game_rules
 from werewolf.notes import current_notes
+from werewolf.rng import rng_for
 from werewolf.visibility import (
     RosterEntry,
     VisibleEvent,
@@ -172,23 +173,72 @@ def build_rules(rules: PublicRules) -> str:
             "what the dead revealed."
         ),
         "- Wolves may lie. Villagers should expect lies.",
+        (
+            "- Never invent events or impressions. Use only what is in your log "
+            "and notes. On the first night nobody has spoken yet, so there is "
+            "nothing to go on: any first-night choice is a guess."
+        ),
+        (
+            "- Voting for no one is fine when there is nothing to go on, but the "
+            "wolves kill every night, so the town cannot wait for ever."
+        ),
+        (
+            "- Think before revealing your role. Anyone who announces a special "
+            "role is likely to be the wolves' next target."
+        ),
+        (
+            "- Do not start your messages with your own name; everyone can "
+            "already see who is speaking."
+        ),
     ]
     return "\n".join(lines)
 
 
-WOLF_GUIDANCE = (
-    "- In wolf chat, do not name yourself or your teammates. Use only the wolf "
-    "labels (Wolf A, Wolf B and so on)."
+ABILITIES = {
+    "wolf": (
+        "- At night you talk privately with the other wolves and propose a kill "
+        "target (kill_target). The kill happens when every living wolf names the "
+        "same target; otherwise one of the named targets is picked at random.\n"
+        "- In wolf chat, do not name yourself or your teammates. Use only the wolf "
+        "labels (Wolf A, Wolf B and so on). The seer may be reading.\n"
+        "- By day you speak and vote like everyone else. Nobody else knows you are "
+        "a wolf, so you will need to blend in and lie convincingly.\n"
+        "- You cannot see anyone else's role."
+    ),
+    "seer": (
+        "- At night you automatically see the wolves' private chat in your log, "
+        "with the speakers shown only as wolf labels. That is your only night "
+        "ability: you have no power to investigate or check anyone, and you "
+        "cannot speak or act at night.\n"
+        "- Work out who the wolves are from how they talk, and keep careful notes.\n"
+        "- By day you speak and vote like everyone else. If you reveal you are "
+        "the seer, the wolves will probably kill you next."
+    ),
+    "doctor": (
+        "- Each night you may protect one living player, yourself included, but "
+        "not the same player two nights running. If the wolves attack that "
+        "player, nobody dies. You may also pass.\n"
+        "- The next morning you are told privately whether your protection "
+        "stopped an attack.\n"
+        "- You do not see the wolf chat and cannot investigate anyone.\n"
+        "- By day you speak and vote like everyone else. If you reveal you are "
+        "the doctor, the wolves may kill you next."
+    ),
+    "villager": (
+        "- You have no night action: you sleep through the night.\n"
+        "- By day you speak and vote. Your power is your reasoning and your vote."
+    ),
+}
+LOVER_ABILITY = (
+    "- Each night you and {name} may whisper privately. Your partner may be on "
+    "the other side: anything you tell them, they could use against you or your "
+    "team. Think carefully before passing on anything you learned at night."
 )
-SEER_GUIDANCE = (
-    "- You cannot speak at night. Work out who the wolves are from how they talk."
+ABILITIES_FOOTER = (
+    "These are all your abilities. You have no other powers, tools or checks."
 )
 
-DOCTOR_GUIDANCE = (
-    "- As the doctor, you may protect any living player each night, and you may "
-    "protect yourself, but not the same player two nights running. You will be "
-    "told if a protection worked."
-)
+
 LOVERS_GUIDANCE = (
     "You are secretly in love with {name}. If either of you dies, the other "
     "dies of a broken heart at once. Your partner's role is unknown to you."
@@ -203,13 +253,14 @@ ROLE_ARTICLES = {
 
 INSTRUCTIONS = {
     "wolf_chat": (
-        "It is night. Talk privately with your teammate. Propose a kill target "
-        "with kill_target (a living non-wolf); the chat ends early when you "
-        "both name the same one."
+        "It is night. Talk privately with your fellow wolves. Propose a kill "
+        "target with kill_target (a living non-wolf); the chat ends early once "
+        "every living wolf names the same one."
     ),
     "seer_notes": (
-        "It is night. You have read the wolves' chat. You cannot speak. Record "
-        "what you noticed in your notes, then pass."
+        "It is night. Tonight's wolf chat is in your log above. You have no "
+        "other night action and cannot speak. Record what you noticed in your "
+        "notes, then pass."
     ),
     "doctor": (
         "It is night and your turn to do your rounds. Choose someone to "
@@ -267,15 +318,18 @@ def _role_section(view: PlayerView, rules: PublicRules) -> str:
         else:
             team = f"Your teammates are {', '.join(mates[:-1])} and {mates[-1]}."
         parts.append(f"You are {view.wolf_label}. {team}")
-        parts.append(WOLF_GUIDANCE)
-    elif view.role == "seer":
-        parts.append(SEER_GUIDANCE)
-    elif view.role == "doctor":
-        parts.append(DOCTOR_GUIDANCE)
     if view.lover_name:
         lovers = LOVERS_GUIDANCE.format(name=view.lover_name)
         parts.append(f"{lovers} {view.lovers_note}" if view.lovers_note else lovers)
     return "\n".join(parts)
+
+
+def _abilities_section(view: PlayerView) -> str:
+    lines = [ABILITIES.get(view.role, ABILITIES["villager"])]
+    if view.lover_name:
+        lines.append(LOVER_ABILITY.format(name=view.lover_name))
+    lines.append(ABILITIES_FOOTER)
+    return "## Your abilities\n" + "\n".join(lines)
 
 
 def _article(role):
@@ -361,6 +415,22 @@ def _roster_line(entry: RosterEntry, reveal: bool) -> str:
 
 SPEAKING_KINDS = {"wolf_chat", "lovers_chat", "discussion"}
 
+AUDIENCE = {
+    "discussion": "Who hears this: everyone, including the wolves.",
+    "wolf_chat": (
+        "Who hears this: your fellow wolves, and the seer may be reading (they "
+        "see wolf labels, not names)."
+    ),
+    "lovers_chat": (
+        "Who hears this: only your partner. They may be on the other side, so "
+        "be careful what you reveal."
+    ),
+}
+SPEECH_RULE = (
+    "Write only the words you say to them: no narration or stage directions. "
+    "Your private reasoning belongs in your notes, not in what you say."
+)
+
 
 def build_player_prompt(
     view: PlayerView,
@@ -392,6 +462,7 @@ def build_player_prompt(
         f"{INSTRUCTIONS[turn.kind]}\n"
         + (f"{turn.extra}\n" if turn.extra else "")
         + (
+            f"{AUDIENCE[turn.kind]}\n{SPEECH_RULE}\n"
             f"Keep what you say to at most {speech_max_chars} characters.\n"
             if turn.kind in SPEAKING_KINDS
             else ""
@@ -402,6 +473,7 @@ def build_player_prompt(
     )
     system = "\n\n".join([
         "## Rules and role\n" + _role_section(view, rules),
+        _abilities_section(view),
         persona,
         roster_text,
         log,
@@ -415,11 +487,16 @@ def build_player_prompt(
 def build_prompt_for(player, turn: Turn) -> list[dict]:
     """Full pipeline through the visibility boundary (touches the DB)."""
     cfg, counts = game_rules(player.game)
+    # Seat order would put the same player first in every roster, and models
+    # favour the first name they see (e.g. for the first night's kill). Shuffle
+    # per player and per day: replayable, and stable within a day for caching.
+    roster = build_roster(player)
+    rng_for(player.game, "roster", str(player.id), str(turn.day)).shuffle(roster)
     return build_player_prompt(
         player_view(player),
         events_visible_to(player, day=turn.day),
         current_notes(player),
-        build_roster(player),
+        roster,
         turn,
         cfg["notes_max_chars"],
         PublicRules(
