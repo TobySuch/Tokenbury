@@ -32,11 +32,11 @@ function ListeningMark() {
 
 function Avatar({ player, className }) {
   return player.avatar_url ? (
-    <img src={player.avatar_url} alt="" className={`rounded-full object-cover ${className}`} />
+    <img src={player.avatar_url} alt="" className={`object-contain ${className}`} />
   ) : (
     <span
       aria-hidden="true"
-      className={`flex items-center justify-center rounded-full bg-chip font-bold ${className}`}
+      className={`flex items-center justify-center rounded-xl bg-chip font-bold ${className}`}
     >
       {player.name.slice(0, 1)}
     </span>
@@ -129,16 +129,13 @@ export default function PlayerCircle({
                 aria-label={p.name}
                 onFocus={() => onHover(p.id)}
                 onBlur={() => onHover(null)}
-                className={`relative flex min-h-[44px] min-w-[44px] cursor-pointer flex-col items-center rounded-full p-1 outline-offset-2 transition-colors ${
+                className={`relative flex min-h-[44px] min-w-[44px] cursor-pointer flex-col items-center rounded-2xl p-1 outline-offset-2 transition-colors ${
                   focused ? 'outline-2 outline-dashed outline-ink' : ''
                 } ${
                   speaking ? 'bg-accent text-accent-ink' : ''
                 } ${!alive ? 'border-2 border-dashed border-ink-muted' : ''}`}
               >
-                <Avatar
-                  player={p}
-                  className="h-11 w-11 border border-rule text-lg sm:h-14 sm:w-14"
-                />
+                <Avatar player={p} className="h-14 w-11 text-lg sm:h-20 sm:w-14" />
                 <span className="mt-0.5 max-w-full truncate text-xs font-semibold">{p.name}</span>
                 {night && p.role === 'seer' && alive && <ListeningMark />}
               </button>

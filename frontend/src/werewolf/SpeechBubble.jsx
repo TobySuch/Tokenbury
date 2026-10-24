@@ -7,7 +7,16 @@ export default function SpeechBubble({ text, x, y }) {
       role="note"
       className={`absolute z-20 w-52 max-w-[70vw] rounded-2xl border border-rule bg-paper px-3 py-2 text-left text-sm italic leading-snug text-ink shadow-md ${vertical} ${horizontal}`}
     >
-      <span className="line-clamp-6">{text}</span>
+      {/* Long speeches scroll inside the bubble; clicks here shouldn't toggle the seat. */}
+      <div
+        data-testid="speech-bubble-scroll"
+        tabIndex={0}
+        aria-label="Speech"
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-40 overflow-y-auto overscroll-contain pr-1"
+      >
+        {text}
+      </div>
     </div>
   )
 }

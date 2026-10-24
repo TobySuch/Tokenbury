@@ -36,7 +36,11 @@ export default function PlayerSidebar({ gameId, player, alive, seq }) {
           </div>
           <div className="border-l-2 border-rule pl-3">
             <p className="text-xs font-semibold text-ink-muted">Private notes at this step</p>
-            <p className="mt-0.5 whitespace-pre-wrap text-sm text-ink-soft">
+            <p
+              data-testid="player-notes"
+              tabIndex={0}
+              className="mt-0.5 max-h-64 overflow-y-auto overscroll-contain whitespace-pre-wrap pr-1 text-sm text-ink-soft lg:max-h-[50vh]"
+            >
               {loaded.key !== key
                 ? 'Loading…'
                 : loaded.text || <span className="italic">No notes yet.</span>}
