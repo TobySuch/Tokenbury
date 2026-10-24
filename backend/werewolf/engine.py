@@ -13,7 +13,16 @@ from django.db import transaction
 from werewolf.agents import LLMAgent, ScriptedAgent, WerewolfAgent
 from werewolf.config import game_config
 from werewolf.events import append_event
-from werewolf.models import ENGINE, PUBLIC, WOLF_CHAT, Game, GameEvent, Player
+from werewolf.models import (
+    ENGINE,
+    LOVERS,
+    PUBLIC,
+    WOLF_CHAT,
+    Game,
+    GameEvent,
+    Player,
+    player_visibility,
+)
 from werewolf.moderator import (
     END_TOOL,
     PICK_TOOL,
@@ -81,9 +90,13 @@ class ScriptedProvider:
         by_name = {t["function"]["name"]: t["function"] for t in tools}
         if "vote" in by_name:
             return self.vote_step(player, day, n)
+        if "protect" in by_name:
+            return self.doctor_step(player, day, n)
         if "speak" in by_name:
             if "kill_target" in by_name["speak"]["parameters"]["properties"]:
                 return self.wolf_step(player, day, n)
+            if game.phase == Phase.NIGHT_LOVERS:
+                return self.lovers_step(player, day, n)
             return self.discussion_step(player, day, n)
         kind = "seer_notes" if game.phase == Phase.NIGHT_SEER else "day_notes"
         return self.notes_step(player, day, n, kind)
@@ -118,6 +131,31 @@ class ScriptedProvider:
                     "message": f"[{player.wolf_label} d{day} #{n}] Let's pick one.",
                     "kill_target": target.name,
                 },
+            )
+        ]
+
+    def doctor_step(self, player, day, n):
+        game = self._fresh_game()
+        rng = rng_for(game, "scripted", "doctor", day)
+        last = _last_protected_name(game, player)
+        choices = [
+            p
+            for p in game.players.filter(alive=True).order_by("seat")
+            if p.name != last
+        ]
+        if not choices or rng.random() < 0.2:
+            return [("pass", {})]
+        return [("protect", {"target": rng.choice(choices).name})]
+
+    def lovers_step(self, player, day, n):
+        game = self._fresh_game()
+        rng = rng_for(game, "scripted", "lovers", player.seat, day, n)
+        if rng.random() < 0.3:
+            return [("pass", {})]
+        return [
+            (
+                "speak",
+                {"message": f"[{player.name} d{day} #{n} love] Thinking of you."},
             )
         ]
 
@@ -161,6 +199,16 @@ class ScriptedProvider:
 # helpers
 
 
+def _last_protected_name(game: Game, doctor) -> str | None:
+    """Who the doctor protected on the previous night (None if nobody)."""
+    previous = GameEvent.objects.filter(
+        game=game, type="protect", actor=doctor, day=game.day_number - 1
+    ).first()
+    if previous is None:
+        return None
+    return Player.objects.get(pk=previous.payload["target_id"]).name
+
+
 def validation_context(game: Game, player, kind: str) -> ValidationContext:
     players = list(game.players.select_related("character").order_by("seat"))
     living = [p for p in players if p.alive]
@@ -173,6 +221,10 @@ def validation_context(game: Game, player, kind: str) -> ValidationContext:
         living_non_wolf_names=[p.name for p in living if p.role != Player.Role.WOLF],
         speech_max_chars=game_config(game)["speech_max_chars"],
         actor_name=player.name,
+        last_protected=(
+            _last_protected_name(game, player) if kind == "doctor" else None
+        ),
+        actor_is_lover=player.lover_id is not None,
     )
 
 
@@ -244,22 +296,32 @@ def _transition(game: Game, to: str, *, next_day: bool = False) -> None:
     game.refresh_from_db()
 
 
+def _mark_dead(game: Game, player: Player, cause: str) -> None:
+    player.alive = False
+    player.save(update_fields=["alive"])
+    reveal = game_config(game)["reveal_role_on_death"]
+    append_event(
+        game,
+        type="death",
+        visibility=PUBLIC,
+        payload={
+            "player_id": player.id,
+            "cause": cause,
+            "role": player.role if reveal else None,
+        },
+    )
+
+
 def _kill(game: Game, player_id: int, cause: str) -> None:
+    """Kill a player; their living lover dies of a broken heart in the same
+    transaction, so a resumed run never sees one death without the other."""
     with transaction.atomic():
         player = Player.objects.get(pk=player_id, game=game)
-        player.alive = False
-        player.save(update_fields=["alive"])
-        reveal = game_config(game)["reveal_role_on_death"]
-        append_event(
-            game,
-            type="death",
-            visibility=PUBLIC,
-            payload={
-                "player_id": player.id,
-                "cause": cause,
-                "role": player.role if reveal else None,
-            },
-        )
+        _mark_dead(game, player, cause)
+        if player.lover_id:
+            lover = Player.objects.get(pk=player.lover_id)
+            if lover.alive:
+                _mark_dead(game, lover, "heartbreak")
 
 
 def _end_game(game: Game, winner: str) -> None:
@@ -275,6 +337,12 @@ def _end_game(game: Game, winner: str) -> None:
 
 def _check_win(game: Game) -> bool:
     living = _living(game)
+    if len(living) == 2:
+        a, b = living
+        mixed = (a.role == Player.Role.WOLF) != (b.role == Player.Role.WOLF)
+        if a.lover_id == b.id and b.lover_id == a.id and mixed:
+            _end_game(game, Game.Winner.LOVERS)
+            return True
     wolves = sum(1 for p in living if p.role == Player.Role.WOLF)
     others = len(living) - wolves
     if wolves == 0:
@@ -340,7 +408,7 @@ def _night_wolf_chat(game, provider) -> None:
             _wolf_turn(
                 game, provider, wolves[turns % len(wolves)], messages, turns, cap
             )
-    _transition(game, Phase.NIGHT_SEER)
+    _transition(game, Phase.NIGHT_DOCTOR)
 
 
 def _wolf_turn(game, provider, wolf, messages, turns, cap) -> None:
@@ -372,6 +440,60 @@ def _wolf_turn(game, provider, wolf, messages, turns, cap) -> None:
     )
 
 
+def _night_doctor(game, provider) -> None:
+    doctor = next((p for p in _living(game) if p.role == Player.Role.DOCTOR), None)
+    acted = _today(game, phase=Phase.NIGHT_DOCTOR, type__in=["protect", "pass"])
+    if doctor and not acted.exists():
+        result = _play(game, provider, doctor, "doctor")
+        target = (
+            _resolve(result.args.get("target"), _living(game))
+            if result.action == "protect"
+            else None
+        )
+        if target:
+            append_event(
+                game,
+                type="protect",
+                visibility=player_visibility(doctor.id),
+                actor=doctor,
+                payload={"target_id": target.id},
+            )
+        else:
+            _write_pass(game, doctor)
+    _transition(game, Phase.NIGHT_LOVERS)
+
+
+def _night_lovers(game, provider) -> None:
+    cap = game_config(game)["lovers_chat_max_messages"]
+    lovers = sorted((p for p in _living(game) if p.lover_id), key=lambda p: p.seat)
+    if len(lovers) == 2 and lovers[0].lover_id == lovers[1].id:
+        while True:
+            turns = list(
+                _today(
+                    game,
+                    phase=Phase.NIGHT_LOVERS,
+                    type__in=["lover_message", "pass"],
+                )
+            )
+            if len(turns) >= cap or (
+                len(turns) >= 2 and all(t.type == "pass" for t in turns[-2:])
+            ):
+                break
+            lover = lovers[len(turns) % 2]
+            result = _play(game, provider, lover, "lovers_chat")
+            if result.action == "speak":
+                append_event(
+                    game,
+                    type="lover_message",
+                    visibility=LOVERS,
+                    actor=lover,
+                    payload={"message": result.args["message"]},
+                )
+            else:
+                _write_pass(game, lover)
+    _transition(game, Phase.NIGHT_SEER)
+
+
 def _night_seer(game, provider) -> None:
     seer = next((p for p in _living(game) if p.role == Player.Role.SEER), None)
     if (
@@ -385,10 +507,27 @@ def _night_seer(game, provider) -> None:
 
 
 def _morning(game, provider) -> None:
-    if not _today(game, type="death", payload__cause="night_kill").exists():
-        target = _today(game, type="wolf_target").first()
-        if target:
-            _kill(game, target.payload["target_id"], "night_kill")
+    target = _today(game, type="wolf_target").first()
+    protect = _today(game, type="protect").first()
+    saved = bool(
+        target
+        and protect
+        and protect.payload["target_id"] == target.payload["target_id"]
+    )
+    if protect and not _today(game, type="save_result").exists():
+        append_event(
+            game,
+            type="save_result",
+            visibility=protect.visibility,
+            payload={"saved": saved},
+        )
+    if target and saved:
+        if not _today(game, type="peaceful_night").exists():
+            append_event(game, type="peaceful_night", visibility=PUBLIC)
+    elif (
+        target and not _today(game, type="death", payload__cause="night_kill").exists()
+    ):
+        _kill(game, target.payload["target_id"], "night_kill")
     if _check_win(game):
         return
     _transition(game, Phase.DISCUSSION)
@@ -509,6 +648,8 @@ def _day_notes(game, provider) -> None:
 
 HANDLERS = {
     Phase.NIGHT_WOLF_CHAT: _night_wolf_chat,
+    Phase.NIGHT_DOCTOR: _night_doctor,
+    Phase.NIGHT_LOVERS: _night_lovers,
     Phase.NIGHT_SEER: _night_seer,
     Phase.MORNING: _morning,
     Phase.DISCUSSION: _discussion,

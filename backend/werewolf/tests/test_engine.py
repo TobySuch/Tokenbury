@@ -131,7 +131,9 @@ def test_full_day_runs_to_next_night():
         for e in events_of(game, type="phase_change")
     ]
     assert changes == [
-        ("night_wolf_chat", "night_seer"),
+        ("night_wolf_chat", "night_doctor"),
+        ("night_doctor", "night_lovers"),
+        ("night_lovers", "night_seer"),
         ("night_seer", "morning"),
         ("morning", "discussion"),
         ("discussion", "vote"),

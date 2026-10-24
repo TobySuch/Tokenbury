@@ -3,6 +3,7 @@ import pytest
 from werewolf import engine
 from werewolf.engine import ScriptedProvider, run_day
 from werewolf.models import AgentCall
+from werewolf.setup import create_game
 from werewolf.tests.factories import create_classic_game, make_characters
 from werewolf.tests.helpers import events_of
 
@@ -27,8 +28,8 @@ def comparable(game):
     ]
 
 
-def clean_run(seed):
-    game = create_classic_game(seed=seed)
+def clean_run(seed, factory=create_classic_game):
+    game = factory(seed=seed)
     phases = []
     real = engine.run_turn
 
@@ -45,8 +46,8 @@ def clean_run(seed):
     return game, phases
 
 
-def crash_then_resume(seed, crash_at, monkeypatch):
-    game = create_classic_game(seed=seed)
+def crash_then_resume(seed, crash_at, monkeypatch, factory=create_classic_game):
+    game = factory(seed=seed)
     real = engine.run_turn
     calls = {"n": 0}
 
@@ -83,6 +84,21 @@ def test_crash_at_every_turn_resumes_without_duplicates(monkeypatch):
         assert comparable(resumed) == expected, f"crash at turn {crash_at}"
         assert resumed.day_number == baseline.day_number
         assert resumed.phase == baseline.phase
+
+
+def test_crash_at_every_turn_resumes_a_default_config_game(monkeypatch):
+    make_characters(7)
+    baseline, phases = clean_run(seed=4, factory=create_game)
+    expected = comparable(baseline)
+    assert {"night_doctor", "night_lovers"} <= set(phases)
+    assert {e.type for e in events_of(baseline)} >= {"lover_message", "protect"}
+    for crash_at in range(1, len(phases) + 1):
+        resumed = crash_then_resume(4, crash_at, monkeypatch, create_game)
+        assert_contiguous(resumed)
+        assert comparable(resumed) == expected, f"crash at turn {crash_at}"
+        assert resumed.day_number == baseline.day_number
+        assert resumed.phase == baseline.phase
+        assert resumed.winner == baseline.winner
 
 
 def test_resume_after_moderator_pick_does_not_call_moderator_again(monkeypatch):

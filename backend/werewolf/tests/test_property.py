@@ -4,12 +4,13 @@ import pytest
 
 from werewolf.engine import ScriptedProvider, run_day
 from werewolf.models import Game, GameEvent, PlayerNotes
+from werewolf.setup import create_game
 from werewolf.tests.factories import create_classic_game, make_characters
 from werewolf.tests.helpers import CapturingProvider, events_of, normalised_log
 
 pytestmark = pytest.mark.django_db
 
-TOKEN = re.compile(r"\[[^\[\]]+ d\d+ #\d+\]")
+TOKEN = re.compile(r"\[[^\[\]]+ d\d+ #\d+(?: love)?\]")
 NOTE_TOKEN = re.compile(r"\[[^\[\]]+ d\d+ #\d+ note\]")
 
 
@@ -34,14 +35,12 @@ def allowed(event, player):
     return (
         event.visibility == "public"
         or (event.visibility == "wolf_chat" and player.role in ("wolf", "seer"))
+        or (event.visibility == "lovers" and player.lover_id is not None)
         or event.visibility == f"player:{player.id}"
     )
 
 
-@pytest.mark.parametrize("seed", range(10))
-def test_visibility_property(seed):
-    make_characters(7)
-    game = create_classic_game(seed=seed)
+def check_visibility(game, seed):
     capture = CapturingProvider(ScriptedProvider(game))
     play_to_end(game, capture)
 
@@ -67,17 +66,59 @@ def test_visibility_property(seed):
                 f"{event.type}/{event.visibility}"
             )
 
+    # Doctor-only facts carry no tokens, so check their rendered text.
+    for prompt in capture.player_prompts:
+        player = players[prompt["player_id"]]
+        if player.role != "doctor":
+            assert "You protected" not in prompt["text"]
+            assert "Your protection" not in prompt["text"]
+        if player.lover_id is None:
+            assert "[Night, to your love]" not in prompt["text"]
+
     # Engine-only events never leak: their types never render and no engine
     # event carries a token.
     for event in events:
         if event.visibility == "engine":
             assert event_token(event) is None
+    return events
 
 
-@pytest.mark.parametrize("seed", [1, 2, 3])
-def test_end_to_end_note_canaries_never_leak(seed):
+@pytest.mark.parametrize("seed", range(10))
+def test_visibility_property(seed):
     make_characters(7)
     game = create_classic_game(seed=seed)
+    check_visibility(game, seed)
+
+
+@pytest.mark.parametrize("players", [5, 6, 7, 9, 12])
+@pytest.mark.parametrize("seed", range(4))
+def test_visibility_property_default_config(players, seed):
+    make_characters(12)
+    game = create_game(seed=seed, config={"player_count": players})
+    events = check_visibility(game, seed)
+    for e in events:
+        if e.type == "lover_message":
+            assert e.visibility == "lovers"
+        if e.type in ("protect", "save_result"):
+            doctor = game.players.get(role="doctor")
+            assert e.visibility == f"player:{doctor.id}"
+
+
+def test_default_config_games_exercise_every_new_channel():
+    make_characters(12)
+    seen = set()
+    for seed in range(8):
+        game = create_game(seed=seed)
+        play_to_end(game, ScriptedProvider(game))
+        seen |= {e.type for e in events_of(game)}
+    assert {"lover_message", "protect", "save_result", "peaceful_night"} <= seen
+
+
+@pytest.mark.parametrize("factory", [create_classic_game, create_game])
+@pytest.mark.parametrize("seed", [1, 2, 3])
+def test_end_to_end_note_canaries_never_leak(seed, factory):
+    make_characters(7)
+    game = factory(seed=seed)
     capture = CapturingProvider(ScriptedProvider(game))
     play_to_end(game, capture)
 
@@ -140,14 +181,15 @@ def test_log_window_day_two_prompts_have_no_day_one_events():
     assert carried
 
 
-def test_replay_reproduces_event_log():
+@pytest.mark.parametrize("factory", [create_classic_game, create_game])
+def test_replay_reproduces_event_log(factory):
     from werewolf.agents import ReplayAgent
     from werewolf.turns import recorded_responses
 
     make_characters(7)
-    game1 = create_classic_game(seed=12)
+    game1 = factory(seed=12)
     play_to_end(game1, ScriptedProvider(game1))
-    game2 = create_classic_game(seed=12)
+    game2 = factory(seed=12)
 
     agent = ReplayAgent(recorded_responses(game1))
 

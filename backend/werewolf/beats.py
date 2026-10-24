@@ -8,10 +8,17 @@ from werewolf.models import Game, GameEvent
 
 Phase = Game.Phase
 
-NIGHT_PHASES = {Phase.NIGHT_WOLF_CHAT, Phase.NIGHT_SEER}
+NIGHT_PHASES = {
+    Phase.NIGHT_WOLF_CHAT,
+    Phase.NIGHT_DOCTOR,
+    Phase.NIGHT_LOVERS,
+    Phase.NIGHT_SEER,
+}
 
 BANNERS = {
     Phase.NIGHT_WOLF_CHAT: "Night {day}",
+    Phase.NIGHT_DOCTOR: "Night {day}: The doctor does their rounds",
+    Phase.NIGHT_LOVERS: "Night {day}: The lovers whisper",
     Phase.NIGHT_SEER: "Night {day}: The seer listens",
     Phase.MORNING: "Day {day}: Morning",
     Phase.DISCUSSION: "Day {day}: Discussion",
