@@ -40,7 +40,15 @@ def active_instance(request):
 
 @api_view(["GET"])
 def active_banner(request):
-    banner = Banner.objects.filter(active=True).first()
+    site = request.query_params.get("site", Banner.Site.TOWN)
+    if site not in (Banner.Site.TOWN, Banner.Site.WEREWOLF):
+        return Response(
+            {"detail": "site must be 'town' or 'werewolf'"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    banner = Banner.objects.filter(
+        active=True, site__in=[site, Banner.Site.BOTH]
+    ).first()
     if banner is None:
         return Response(status=status.HTTP_404_NOT_FOUND)
     return Response(BannerSerializer(banner).data)

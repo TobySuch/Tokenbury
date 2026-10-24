@@ -16,7 +16,7 @@ beforeEach(() => {
           }),
       })
     }
-    if (url === '/api/banner/') {
+    if (url.startsWith('/api/banner/')) {
       return Promise.resolve({ ok: false })
     }
     return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })

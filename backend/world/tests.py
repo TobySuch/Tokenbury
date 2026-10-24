@@ -528,3 +528,46 @@ def test_locations_filtered_by_active_instance(client):
     response = client.get("/api/locations/")
     assert response.status_code == 200
     assert len(response.json()) == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "site, expected",
+    [
+        ("town", "Town news"),
+        ("werewolf", "Werewolf news"),
+    ],
+)
+def test_banner_endpoint_filters_by_site(client, site, expected):
+    Banner.objects.create(text="Town news", site=Banner.Site.TOWN)
+    Banner.objects.create(text="Werewolf news", site=Banner.Site.WEREWOLF)
+    response = client.get(f"/api/banner/?site={site}")
+    assert response.status_code == 200
+    assert response.json()["text"] == expected
+
+
+@pytest.mark.django_db
+def test_banner_for_both_sites_shows_everywhere(client):
+    Banner.objects.create(text="Everyone hello")
+    for site in ["town", "werewolf"]:
+        assert (
+            client.get(f"/api/banner/?site={site}").json()["text"] == "Everyone hello"
+        )
+
+
+@pytest.mark.django_db
+def test_banner_defaults_to_both_sites():
+    assert Banner.objects.create(text="x").site == Banner.Site.BOTH
+
+
+@pytest.mark.django_db
+def test_banner_without_site_param_is_the_town_banner(client):
+    Banner.objects.create(text="Werewolf only", site=Banner.Site.WEREWOLF)
+    assert client.get("/api/banner/").status_code == 404
+    Banner.objects.create(text="Town only", site=Banner.Site.TOWN)
+    assert client.get("/api/banner/").json()["text"] == "Town only"
+
+
+@pytest.mark.django_db
+def test_banner_unknown_site_is_a_bad_request(client):
+    assert client.get("/api/banner/?site=mars").status_code == 400
