@@ -469,3 +469,61 @@ def test_query_count_with_lovers(rich):
     with CaptureQueriesContext(connection) as ctx:
         events_visible_to(p)
     assert len(ctx) <= 2
+
+
+def _public_death(game, player, cause, lover=None, day=1, role=None):
+    append_event(
+        game,
+        type="death",
+        visibility=PUBLIC,
+        day=day,
+        payload={
+            "player_id": player.id,
+            "cause": cause,
+            "role": role or player.role,
+            "lover_id": lover.id if lover else None,
+        },
+    )
+
+
+def test_death_lover_converted_to_a_name(rich):
+    a, b, viewer = list(rich.players.order_by("seat"))[:3]
+    _public_death(rich, a, "night_kill", lover=b)
+    (death,) = [e for e in events_visible_to(viewer) if e.type == "death"]
+    assert death.payload["lover"] == b.name
+    assert "lover_id" not in death.payload
+
+
+def test_death_lover_dropped_when_roles_hidden():
+    make_characters(12)
+    g = create_game(seed=3, config={"reveal_role_on_death": False})
+    a, b, viewer = list(g.players.order_by("seat"))[:3]
+    _public_death(g, a, "night_kill", lover=b)
+    (death,) = [e for e in events_visible_to(viewer) if e.type == "death"]
+    assert "lover" not in death.payload and "role" not in death.payload
+
+
+def test_roster_shows_cause_day_and_lover_of_the_dead(rich):
+    a, b, viewer = list(rich.players.order_by("seat"))[:3]
+    Player.objects.filter(pk__in=[a.pk, b.pk]).update(alive=False)
+    _public_death(rich, a, "night_kill", lover=b, day=2)
+    _public_death(rich, b, "heartbreak", lover=a, day=2)
+    by_name = {r.name: r for r in build_roster(viewer)}
+    assert by_name[a.name].cause == "night_kill"
+    assert by_name[a.name].died_day == 2
+    assert by_name[a.name].lover == b.name
+    assert by_name[b.name].cause == "heartbreak"
+    assert by_name[b.name].lover == a.name
+    alive = next(r for r in by_name.values() if r.alive)
+    assert alive.cause is None and alive.lover is None
+
+
+def test_roster_shows_cause_but_not_lover_when_roles_hidden():
+    make_characters(12)
+    g = create_game(seed=3, config={"reveal_role_on_death": False})
+    a, b, viewer = list(g.players.order_by("seat"))[:3]
+    Player.objects.filter(pk=a.pk).update(alive=False)
+    _public_death(g, a, "vote", lover=b)
+    entry = next(r for r in build_roster(viewer) if r.name == a.name)
+    assert entry.cause == "vote" and entry.died_day == 1
+    assert entry.lover is None and entry.role is None

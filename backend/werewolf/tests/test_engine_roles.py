@@ -515,3 +515,21 @@ def test_no_wolf_target_means_no_save_result():
     )
     _morning(game, ScriptedProvider(game))
     assert events_of(game, type="save_result") == []
+
+
+def test_deaths_reveal_the_lover_when_roles_are_revealed():
+    game = new_game()
+    a, b = two_villagers(game)
+    run_day(game, Cast(game, kill=a))
+    first, second = events_of(fresh(game), type="death")
+    assert first.payload["lover_id"] == b.id
+    assert second.payload["lover_id"] == a.id
+
+
+def test_deaths_hide_the_lover_when_roles_are_hidden():
+    game = new_game(reveal_role_on_death=False)
+    a, _b = two_villagers(game)
+    run_day(game, Cast(game, kill=a))
+    assert all(
+        d.payload["lover_id"] is None for d in events_of(fresh(game), type="death")
+    )

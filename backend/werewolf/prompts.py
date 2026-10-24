@@ -110,6 +110,70 @@ def _night_lines(rules: PublicRules) -> list[str]:
     return lines
 
 
+def _facts(rules: PublicRules) -> list[str]:
+    """How every role and announcement works. Public knowledge, so players can
+    reason from it (and don't treat a certain deduction as a wild guess)."""
+    has_seer = bool(rules.role_counts.get("seer"))
+    has_doctor = bool(rules.role_counts.get("doctor"))
+    facts = [
+        (
+            "- Every death is announced to everyone with its cause: killed in the "
+            "night by the wolves, eliminated by the vote"
+            + (", or died of a broken heart." if rules.lovers_enabled else ".")
+        ),
+    ]
+    if rules.reveal_role_on_death:
+        facts.append(
+            "- When a player dies, their role is revealed to everyone"
+            + (
+                ", and so is their lover if they had one."
+                if rules.lovers_enabled
+                else "."
+            )
+        )
+    else:
+        facts.append("- Roles are not revealed when players die.")
+    if rules.lovers_enabled:
+        facts.append(
+            "- A death by broken heart only happens when that player's lover has "
+            "just died. So the player who died of a broken heart and the player "
+            "who died just before them were the lovers: that is certain, not a "
+            "guess."
+        )
+    if has_doctor:
+        facts.append(
+            '- "Nobody died last night" means the doctor protected the wolves\' '
+            "target. Only the doctor is told whether their protection worked; "
+            "nobody is told who was protected."
+        )
+    if has_seer:
+        facts.append(
+            "- The seer only sees the wolves' chat, with the speakers shown as "
+            "wolf labels, never names."
+        )
+    facts.append(
+        "- Nobody can investigate or check another player's role. The wolves "
+        "know who the other wolves are"
+        + (
+            ", and the lovers know who their partner is but not their partner's role."
+            if rules.lovers_enabled
+            else "."
+        )
+        + " Nobody else knows anyone's role."
+    )
+    private = ["the wolves' chat"]
+    if rules.lovers_enabled:
+        private.append("the lovers' whisper")
+    facts.append(
+        f"- {' and '.join(private).capitalize()} "
+        + ("are" if len(private) > 1 else "is")
+        + " private: nobody else hears "
+        + ("them" if len(private) > 1 else "it")
+        + (" (except the seer, who reads the wolves' chat)." if has_seer else ".")
+    )
+    return ["## How everything works (everyone knows this)", *facts]
+
+
 def build_rules(rules: PublicRules) -> str:
     seer_listening = bool(rules.role_counts.get("seer"))
     morning = (
@@ -159,6 +223,7 @@ def build_rules(rules: PublicRules) -> str:
                 "wolves' night chat, so wolves should assume someone is reading it."
             ),
         ]
+    lines += ["", *_facts(rules)]
     lines += [
         "",
         "General guidance:",
@@ -365,6 +430,8 @@ def _death(p) -> str:
             line = f"{p['player']} was eliminated by vote."
     if p.get("role"):
         line += f" They were {_article(p['role'])}."
+    if p.get("lover"):
+        line += f" Their lover was {p['lover']}."
     return line
 
 
@@ -405,12 +472,29 @@ def render_event(event: VisibleEvent) -> str:
             return ""
 
 
+CAUSE_PHRASES = {
+    "night_kill": "killed in the night",
+    "vote": "eliminated by vote",
+    "heartbreak": "died of a broken heart",
+}
+
+
 def _roster_line(entry: RosterEntry, reveal: bool) -> str:
     if entry.alive:
         return f"- {entry.name} (alive)"
+    details = []
+    if entry.cause:
+        how = CAUSE_PHRASES.get(entry.cause, "died")
+        details.append(f"{how} on day {entry.died_day}" if entry.died_day else how)
     if reveal and entry.role:
-        return f"- {entry.name} (dead, was {_article(entry.role)})"
-    return f"- {entry.name} (dead)"
+        details.append(f"was {_article(entry.role)}")
+    if reveal and entry.lover:
+        details.append(f"{entry.lover}'s lover")
+    return (
+        f"- {entry.name} (dead: {'; '.join(details)})"
+        if details
+        else f"- {entry.name} (dead)"
+    )
 
 
 SPEAKING_KINDS = {"wolf_chat", "lovers_chat", "discussion"}

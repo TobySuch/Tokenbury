@@ -18,6 +18,7 @@ ID_KEYS = {
     "player_id": "player",
     "eliminated_id": "eliminated",
     "voter_id": "voter",
+    "lover_id": "lover",
 }
 
 
@@ -36,6 +37,10 @@ class RosterEntry:
     name: str
     alive: bool
     role: str | None
+    # For the dead, from their public death announcement.
+    cause: str | None = None
+    died_day: int | None = None
+    lover: str | None = None
 
 
 def _name(names, pid):
@@ -64,6 +69,7 @@ def _sanitise(event, names, reveal_role):
         }
     if event.type == "death" and not reveal_role:
         payload.pop("role", None)
+        payload.pop("lover", None)
     return payload
 
 
@@ -125,24 +131,43 @@ def events_visible_to(player, day=None) -> list[VisibleEvent]:
 
 
 def build_roster(player) -> list[RosterEntry]:
-    """Everyone except the viewer, in seat order. Roles only for the dead
-    (and only when reveal_role_on_death is on)."""
+    """Everyone except the viewer, in seat order. The dead show how and when
+    they died (public); their role and lover only when reveal_role_on_death
+    is on."""
     reveal = game_config(player.game)["reveal_role_on_death"]
-    others = (
+    players = list(
         Player.objects
         .filter(game_id=player.game_id)
-        .exclude(pk=player.pk)
         .select_related("character")
         .order_by("seat")
     )
-    return [
-        RosterEntry(
-            name=p.name,
-            alive=p.alive,
-            role=p.role if (reveal and not p.alive) else None,
+    names = {p.id: p.name for p in players}
+    deaths = {
+        e.payload.get("player_id"): e
+        for e in GameEvent.objects.filter(
+            game_id=player.game_id, type=GameEvent.Type.DEATH, visibility=PUBLIC
         )
-        for p in others
-    ]
+    }
+    entries = []
+    for p in players:
+        if p.pk == player.pk:
+            continue
+        death = None if p.alive else deaths.get(p.id)
+        entries.append(
+            RosterEntry(
+                name=p.name,
+                alive=p.alive,
+                role=p.role if (reveal and not p.alive) else None,
+                cause=death.payload.get("cause") if death else None,
+                died_day=death.day if death else None,
+                lover=(
+                    names.get(death.payload.get("lover_id"))
+                    if death and reveal
+                    else None
+                ),
+            )
+        )
+    return entries
 
 
 def own_role_info(player) -> dict:

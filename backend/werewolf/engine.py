@@ -308,6 +308,8 @@ def _mark_dead(game: Game, player: Player, cause: str) -> None:
             "player_id": player.id,
             "cause": cause,
             "role": player.role if reveal else None,
+            # Lovers are revealed along with roles.
+            "lover_id": player.lover_id if reveal else None,
         },
     )
 
