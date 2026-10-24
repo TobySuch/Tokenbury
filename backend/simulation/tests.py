@@ -5,8 +5,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.utils import timezone as tz
 
-from world.models import Agent, AgentTick, DailyPlan, Instance, Location, Tick
-
 from simulation.llm import LLMError, call_llm
 from simulation.pipeline import TickContext, _extract_json, _normalise
 from simulation.prompts import build_activity_prompt, build_location_prompt
@@ -16,7 +14,7 @@ from simulation.runner import (
     _round_to_interval,
     run_tick,
 )
-
+from world.models import Agent, AgentTick, DailyPlan, Instance, Location, Tick
 
 # --- factories ---
 

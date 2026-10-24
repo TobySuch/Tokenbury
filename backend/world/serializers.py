@@ -1,4 +1,5 @@
 from rest_framework import serializers
+
 from world.models import Agent, AgentTick, Banner, DailyPlan, Instance, Location, Tick
 
 

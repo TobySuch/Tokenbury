@@ -19,7 +19,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        lock_fd = open(LOCK_FILE, "w")
+        lock_fd = open(LOCK_FILE, "w")  # noqa: SIM115 - held open for the process lifetime
         try:
             fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:

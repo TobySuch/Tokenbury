@@ -7,11 +7,11 @@ if TYPE_CHECKING:
 
 
 def build_location_prompt(
-    agent: "Agent",
-    tick: "Tick",
-    previous_agent_ticks: list["AgentTick"],
+    agent: Agent,
+    tick: Tick,
+    previous_agent_ticks: list[AgentTick],
     world_state: list[dict],
-    locations: list["Location"],
+    locations: list[Location],
     daily_plan: list[str] | None = None,
     needs_plan: bool = False,
 ) -> str:
@@ -77,10 +77,10 @@ Respond with only a JSON object with these fields:
 
 
 def build_activity_prompt(
-    agent: "Agent",
-    tick: "Tick",
-    previous_agent_ticks: list["AgentTick"],
-    resolved_location: "Location | None",
+    agent: Agent,
+    tick: Tick,
+    previous_agent_ticks: list[AgentTick],
+    resolved_location: Location | None,
     intention: str,
     co_located: list[tuple[str, str]],
 ) -> str:
