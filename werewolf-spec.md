@@ -282,7 +282,7 @@ Day 1 is at most about 80 calls, and later days shrink as players die. Moderator
 - Max 4 note calls per turn.
 - Discussion capped at 30 messages and 6 per player; wolf chat at 6 messages.
 - Max 8 game days; reaching it ends the game as a draw.
-- Per-game budget of 400 calls. Exceeding it sets `status=aborted`.
+- Per-game budget of 500 calls (`call_budget`). Exceeding it sets `status=aborted`.
 - Per-call timeout, then the fallback action applies.
 
 ## Test plan

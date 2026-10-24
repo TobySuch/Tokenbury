@@ -55,7 +55,10 @@ Starts the Django backend on `:8000` and the Vite frontend on `:5173`. Vite prox
 | `LLM_MODEL` | No | `anthropic/claude-haiku-4-5` | Model to use for agent generation |
 | `TICK_INTERVAL_MINUTES` | No | `15` | How many minutes of in-game time each tick advances |
 | `PLAN_HOUR` | No | `6` | In-game hour when agents form their daily plan |
+| `API_HIDE_FUTURE_TICKS` | No | `false` | When `true`, the tick API hides ticks whose in-game time is still in the future |
 | `LOG_LEVEL` | No | `INFO` | Logging verbosity |
+| `WEREWOLF_LLM_MODEL` | No | `anthropic/claude-haiku-5.5` | Model used by the werewolf game (players and moderator) |
+| `WEREWOLF_RUN_HOUR` | No | `0` | Hour (UTC) after which `run_day --if-due` plays the day's run |
 
 ---
 
@@ -103,13 +106,61 @@ make prod-down
 | `SQL_USER` | Yes | Must match `POSTGRES_USER` |
 | `SQL_PASSWORD` | Yes | Must match `POSTGRES_PASSWORD` |
 | `CORS_ALLOWED_ORIGINS` | No | Comma-separated CORS origins if frontend is on a different domain |
-| `LLM_MODEL` | No | `anthropic/claude-haiku-4-5` |
-| `TICK_INTERVAL_MINUTES` | No | `15` |
-| `LOG_LEVEL` | No | `INFO` |
+| `CSRF_TRUSTED_ORIGINS` | No | Comma-separated origins trusted for CSRF (e.g. `https://yourdomain.com`), needed for admin logins over HTTPS behind the proxy |
+| `LLM_MODEL` | No | Town simulation model. Default `anthropic/claude-haiku-4-5` |
+| `TICK_INTERVAL_MINUTES` | No | In-game minutes per tick. Default `15` |
+| `PLAN_HOUR` | No | In-game hour for daily plans. Default `6` |
+| `API_HIDE_FUTURE_TICKS` | No | `true` hides ticks whose in-game time is in the future. Default `false` |
+| `LOG_LEVEL` | No | Default `INFO` |
+| `COMPOSE_PROFILES` | No | Optional services to run: `ticker` (town auto-ticker), `werewolf` (daily werewolf runner), or `ticker,werewolf` |
+| `TICKER_POLL_INTERVAL_MINUTES` | No | How often the ticker service checks for a due tick. Default `5` |
+| `WEREWOLF_LLM_MODEL` | No | Werewolf game model. Default `anthropic/claude-haiku-5.5` |
+| `WEREWOLF_RUN_HOUR` | No | Hour (UTC) after which the werewolf runner plays each day. Default `0` (midnight) |
+| `WEREWOLF_POLL_INTERVAL_MINUTES` | No | How often the werewolf runner checks whether a day is due. Default `15` |
+| `PLAUSIBLE_DOMAIN`, `PLAUSIBLE_URL` | No | Read by Caddy when serving `index.html`. If both are set, the Plausible script `${PLAUSIBLE_URL}/js/script.js` is added for `PLAUSIBLE_DOMAIN`. Set them on the `caddy` service |
 
 ### HTTPS
 
 Caddy handles TLS automatically via Let's Encrypt when `ALLOWED_HOSTS` is set to a real domain. Update the `Caddyfile` host from `:80` to your domain name, and ensure ports 80 and 443 are open.
+
+---
+
+## Werewolf
+
+A separate game in which the AI characters play Werewolf, watchable at `/werewolf`. The rules and design are in [`werewolf-spec.md`](./werewolf-spec.md).
+
+### Running a game
+
+1. Seed the cast once: `cd backend && uv run python manage.py seed_werewolf_characters`. In production, run it in the `backend` container so avatars are copied into the media volume.
+2. Create a game in the admin (Werewolf → Games → Add) or with `make werewolf-game ARGS="--seed 7"`. New games start **unpublished**, so they are hidden from the site and skipped by the scheduler.
+3. Optionally play a day by hand to check it: `make werewolf-day ARGS="--game <id>"`. Add `--scripted` to use canned actions with no LLM calls.
+4. Tick **Published** on the game in the admin, or pass `--publish` when creating it.
+5. To play one day per day automatically, enable the `werewolf` Compose profile. Each day after `WEREWOLF_RUN_HOUR` (UTC), it plays one night and day of the latest published active game.
+
+### Game settings
+
+Set per game when it's created (the admin form's settings JSON, or `--config key=value`), and read-only afterwards. Any key left out uses its default.
+
+| Setting | Default | Description |
+|---|---|---|
+| `player_count` | `7` | Number of players, 5–12 |
+| `wolf_count` | `null` (auto) | Wolves. Auto is about one per 3.5 players |
+| `seer_count` | `null` (auto) | 0 or 1. Auto is 1 |
+| `doctor_count` | `null` (auto) | 0 or 1. Auto is 1 from 6 players |
+| `lovers` | `true` | Secretly link two players (never two wolves) as lovers |
+| `lovers_chat_max_messages` | `4` | Messages in the lovers' nightly private chat |
+| `reveal_role_on_death` | `true` | Announce a player's role when they die |
+| `votes_public` | `true` | The vote result shows who voted for whom (otherwise counts only) |
+| `wolf_chat_max_messages` | `6` | Wolf chat turns per night before the engine picks the kill |
+| `discussion_min_messages` | `6` | Messages before the moderator may end the discussion |
+| `discussion_max_messages` | `30` | Hard cap on messages in a day's discussion |
+| `discussion_max_per_player` | `6` | Messages per player per discussion |
+| `max_days` | `8` | Days before the game ends in a draw |
+| `speech_max_chars` | `400` | Maximum length of one message |
+| `notes_max_chars` | `3000` | Maximum size of a player's private notes |
+| `max_note_calls_per_turn` | `4` | Note edits allowed in one turn |
+| `call_budget` | `500` | Maximum LLM calls for the whole game (players and moderator, including retries). Reaching it aborts the game |
+| `call_timeout_seconds` | `60` | Timeout for each LLM call; a timed-out turn falls back to pass, or to voting for no one |
 
 ---
 
@@ -122,6 +173,8 @@ make migrations       # makemigrations + migrate in one go
 make shell            # Django shell
 make createsuperuser  # create a Django admin user
 make ticker           # run the simulation ticker
+make werewolf-game    # create a werewolf game (ARGS="--seed 7 --publish")
+make werewolf-day     # play the next werewolf day (ARGS="--game <id> [--scripted] [--until-over]")
 make format           # format Python + frontend code
 make lint             # lint frontend and backend
 make test             # run all tests

@@ -9,7 +9,7 @@ DEFAULT_CONFIG = {
     "notes_max_chars": 3000,
     "speech_max_chars": 400,
     "max_note_calls_per_turn": 4,
-    "call_budget": 400,
+    "call_budget": 500,
     "call_timeout_seconds": 60,
     "player_count": 7,
     # None means "auto": derived from player_count by role_counts().

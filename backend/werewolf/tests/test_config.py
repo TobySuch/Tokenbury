@@ -9,7 +9,7 @@ def test_defaults():
     assert cfg == DEFAULT_CONFIG
     assert cfg["wolf_chat_max_messages"] == 6
     assert cfg["reveal_role_on_death"] is True
-    assert cfg["call_budget"] == 400
+    assert cfg["call_budget"] == 500
 
 
 def test_overrides_merge_without_mutating_defaults():
@@ -140,3 +140,13 @@ def test_modern_stored_config_is_untouched():
     game = make_game(config=build_config({"player_count": 8}))
     cfg = game_config(game)
     assert cfg["doctor_count"] is None and cfg["lovers"] is True
+
+
+def test_every_setting_is_documented_in_the_readme():
+    from pathlib import Path
+
+    from django.conf import settings
+
+    readme = (Path(settings.BASE_DIR).parent / "README.md").read_text()
+    missing = [key for key in DEFAULT_CONFIG if f"| `{key}` |" not in readme]
+    assert not missing, f"Document these game settings in README.md: {missing}"

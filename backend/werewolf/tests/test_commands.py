@@ -224,3 +224,18 @@ def test_run_day_game_option_can_run_an_unpublished_game(db):
     call_command("run_day", "--scripted", "--game", str(draft.pk))
     draft.refresh_from_db()
     assert draft.day_number == 2
+
+
+def test_run_hour_defaults_to_midnight():
+    from django.conf import settings
+
+    assert settings.WEREWOLF_RUN_HOUR == 0
+
+
+def test_if_due_runs_just_after_midnight_by_default(db, monkeypatch):
+    make_characters(7)
+    game = create_classic_game(seed=3, published=True)
+    at_hour(monkeypatch, 0)
+    call_command("run_day", "--scripted", "--if-due")
+    game.refresh_from_db()
+    assert game.day_number == 2

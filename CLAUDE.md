@@ -193,6 +193,8 @@ make werewolf-day ARGS="--scripted --until-over"  # play with scripted agents, n
 make werewolf-day                             # play one day with the LLM (costs money)
 ```
 
+Game settings and werewolf env vars are documented in the README ("Werewolf" section). Keep that table in sync with `werewolf/config.py` `DEFAULT_CONFIG`.
+
 ---
 
 ## Django Apps
