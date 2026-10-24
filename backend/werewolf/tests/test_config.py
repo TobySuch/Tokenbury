@@ -116,3 +116,27 @@ def test_none_default_keys_reject_junk():
 def test_invalid_mixes_rejected(overrides, message):
     with pytest.raises(ValueError, match=message):
         build_config(overrides)
+
+
+@pytest.mark.django_db
+def test_legacy_stored_config_gets_classic_rules():
+    from werewolf.setup import create_game
+    from werewolf.tests.factories import make_characters
+
+    make_characters(7)
+    game = create_game(seed=1, config={"doctor_count": 0, "lovers": False})
+    game.config = {"max_days": 3}  # stored before player_count existed
+    game.save()
+    cfg = game_config(game)
+    assert cfg["player_count"] == 7
+    assert cfg["doctor_count"] == 0
+    assert cfg["lovers"] is False
+    assert cfg["max_days"] == 3
+    assert role_counts(cfg) == {"wolf": 2, "seer": 1, "doctor": 0, "villager": 4}
+
+
+@pytest.mark.django_db
+def test_modern_stored_config_is_untouched():
+    game = make_game(config=build_config({"player_count": 8}))
+    cfg = game_config(game)
+    assert cfg["doctor_count"] is None and cfg["lovers"] is True

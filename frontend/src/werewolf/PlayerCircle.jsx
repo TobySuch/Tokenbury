@@ -48,7 +48,7 @@ function ShieldMark() {
     <svg
       data-testid="shield-mark"
       viewBox="0 0 24 24"
-      className="absolute -right-1 -top-1 h-5 w-5 rounded-full bg-paper p-0.5 text-emerald-600"
+      className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-paper p-0.5 text-emerald-600"
       fill="currentColor"
     >
       <title>Protected</title>
@@ -108,7 +108,7 @@ export default function PlayerCircle({
     if (!beat) return false
     if (beat.kind === 'wolf_message') return p.id !== beat.actor_id
     if (beat.kind === 'lover_message') return !loverIds.has(p.id)
-    if (beat.kind === 'protect') return p.id !== beat.actor_id
+    if (beat.kind === 'protect') return p.id !== beat.actor_id && p.id !== beat.target_id
     return night && p.role !== 'wolf'
   }
 

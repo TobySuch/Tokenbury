@@ -743,3 +743,38 @@ def test_seer_anonymity_holds_with_three_wolves():
 def test_lone_wolf_is_told_so():
     v = view("wolf", wolf_label="Wolf A", teammates=())
     assert "You are the only wolf." in text(build(v))
+
+
+# ---- code review fixes ----
+
+
+def test_player_view_builds_teammates_from_legacy_payload(game):
+    w = game.players.filter(role="wolf").first()
+    ev_ = game.events.get(type="role_assigned", actor=w)
+    ev_.payload.pop("teammates")
+    ev_.payload.update(teammate_name="Old Mate", teammate_label="Wolf B")
+    ev_.save()
+    assert player_view(w).teammates == (("Old Mate", "Wolf B"),)
+
+
+def test_no_seer_means_no_seer_listening_line_at_night():
+    t = rules_text(player_count=5, counts={"wolf": 1, "villager": 4}, lovers=False)
+    assert "seer" not in t.lower()
+    t2 = rules_text(counts={"wolf": 2, "doctor": 1, "villager": 4})
+    assert "seer" not in t2.lower()
+
+
+def test_legacy_game_prompt_states_the_classic_rules():
+    make_characters(7)
+    game = create_classic_game(seed=5)
+    game.config = {
+        k: v
+        for k, v in game.config.items()
+        if k
+        not in {"player_count", "doctor_count", "lovers", "lovers_chat_max_messages"}
+    }
+    game.save()
+    p = game.players.first()
+    prompt = text(build_prompt_for(p, t_for("discussion")))
+    assert "7 players: 2 wolves, 1 seer and 4 villagers" in prompt
+    assert "lovers" not in prompt.lower()

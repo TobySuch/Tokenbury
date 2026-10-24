@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass, field
 
-from werewolf.config import game_config, role_counts
+from werewolf.config import game_rules
 from werewolf.notes import current_notes
 from werewolf.visibility import (
     RosterEntry,
@@ -70,11 +70,15 @@ def _mix(counts):
 
 def _night_lines(rules: PublicRules) -> list[str]:
     wolves = rules.role_counts.get("wolf", 0)
+    seer = bool(rules.role_counts.get("seer"))
     if wolves == 1:
         lines = [
-            (
-                "- Night: the wolf chooses someone to kill. The seer may be "
-                "listening, but only sees the speaker as Wolf A, never a name."
+            "- Night: the wolf chooses someone to kill."
+            + (
+                " The seer may be listening, but only sees the speaker as "
+                "Wolf A, never a name."
+                if seer
+                else ""
             )
         ]
     else:
@@ -82,9 +86,14 @@ def _night_lines(rules: PublicRules) -> list[str]:
         lines = [
             (
                 f"- Night: the {word} wolves chat privately and choose someone to "
-                "kill. They are shown to each other as Wolf A, Wolf B and so on. "
-                "The seer may be listening to this chat, but only sees the speakers "
-                "as wolf labels, never their names, and cannot speak or act at night."
+                "kill. They are shown to each other as Wolf A, Wolf B and so on."
+                + (
+                    " The seer may be listening to this chat, but only sees the "
+                    "speakers as wolf labels, never their names, and cannot speak "
+                    "or act at night."
+                    if seer
+                    else ""
+                )
             )
         ]
     if rules.role_counts.get("doctor"):
@@ -226,6 +235,9 @@ INSTRUCTIONS = {
 
 def player_view(player) -> PlayerView:
     info = own_role_info(player)
+    teammates = tuple((t["name"], t["label"]) for t in info.get("teammates", []))
+    if not teammates and info.get("teammate_name"):  # pre-teammates games
+        teammates = ((info["teammate_name"], info.get("teammate_label", "")),)
     return PlayerView(
         player_id=player.id,
         name=player.name,
@@ -233,7 +245,7 @@ def player_view(player) -> PlayerView:
         talkativeness=player.character.talkativeness,
         win_condition=info.get("win_condition", ""),
         wolf_label=info.get("wolf_label"),
-        teammates=tuple((t["name"], t["label"]) for t in info.get("teammates", [])),
+        teammates=teammates,
         lover_name=info.get("lover_name"),
         lovers_note=info.get("lovers_note"),
     )
@@ -402,7 +414,7 @@ def build_player_prompt(
 
 def build_prompt_for(player, turn: Turn) -> list[dict]:
     """Full pipeline through the visibility boundary (touches the DB)."""
-    cfg = game_config(player.game)
+    cfg, counts = game_rules(player.game)
     return build_player_prompt(
         player_view(player),
         events_visible_to(player, day=turn.day),
@@ -412,7 +424,7 @@ def build_prompt_for(player, turn: Turn) -> list[dict]:
         cfg["notes_max_chars"],
         PublicRules(
             player_count=cfg["player_count"],
-            role_counts=role_counts(cfg),
+            role_counts=counts,
             lovers_enabled=cfg["lovers"],
             reveal_role_on_death=cfg["reveal_role_on_death"],
         ),

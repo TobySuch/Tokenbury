@@ -128,7 +128,7 @@ def build_beats(game) -> list[dict]:
                 continue
             if victim.id in alive:
                 alive.remove(victim.id)
-            kind, text = DEATH_BEATS.get(p["cause"], DEATH_BEATS["vote"])
+            kind, text = DEATH_BEATS.get(p["cause"], ("morning", "{name} died."))
             add(
                 e.seq,
                 kind,
