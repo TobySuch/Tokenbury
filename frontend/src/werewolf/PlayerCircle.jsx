@@ -43,8 +43,15 @@ function Avatar({ player, className }) {
   )
 }
 
-function winnerText(winner) {
-  return winner === 'wolves' || winner === 'wolf' ? 'The wolves win' : 'The town wins'
+const WINNER_TEXT = {
+  wolves: 'The wolves win',
+  town: 'The town wins',
+  draw: 'A draw: the game ran out of days',
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function winnerText(winner) {
+  return WINNER_TEXT[winner] ?? 'Game over'
 }
 
 export default function PlayerCircle({

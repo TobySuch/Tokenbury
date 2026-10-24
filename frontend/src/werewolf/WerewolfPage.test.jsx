@@ -1,5 +1,6 @@
 import { render, screen, act, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { winnerText } from './PlayerCircle'
 import WerewolfPage from './WerewolfPage'
 
 const NAMES = ['Alice', 'Bram', 'Cora', 'Dave', 'Edie', 'Finn', 'Gus']
@@ -313,5 +314,15 @@ describe('sidebar', () => {
     fireEvent.click(screen.getByTestId('seat-4'))
     expect(screen.getByTestId('player-sidebar')).toHaveTextContent('Dave')
     expect(screen.getByTestId('player-sidebar')).toHaveTextContent(/villager/i)
+  })
+})
+
+describe('winnerText', () => {
+  test.each([
+    ['wolves', 'The wolves win'],
+    ['town', 'The town wins'],
+    ['draw', 'A draw: the game ran out of days'],
+  ])('%s', (winner, text) => {
+    expect(winnerText(winner)).toBe(text)
   })
 })
