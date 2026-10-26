@@ -180,3 +180,67 @@ def test_publish_and_unpublish_actions(admin_client):
     )
     game.refresh_from_db()
     assert game.published is False
+
+
+def _two_games(admin_client):
+    make_characters(8)
+    _post(admin_client, seed="1")
+    _post(admin_client, seed="2")
+    return Game.objects.order_by("pk")
+
+
+def test_inline_lover_choices_are_limited_to_the_game(admin_client):
+    game, other = _two_games(admin_client)
+    resp = admin_client.get(f"/admin/werewolf/game/{game.pk}/change/")
+    formset = resp.context["inline_admin_formsets"][0].formset
+    for form in formset.forms:
+        choices = set(form.fields["lover"].queryset)
+        assert choices == set(game.players.exclude(pk=form.instance.pk))
+        assert not choices & set(other.players.all())
+
+
+def test_player_admin_lover_choices_are_limited_to_the_game(admin_client):
+    game, _ = _two_games(admin_client)
+    player = game.players.first()
+    resp = admin_client.get(f"/admin/werewolf/player/{player.pk}/change/")
+    queryset = resp.context["adminform"].form.fields["lover"].queryset
+    assert set(queryset) == set(game.players.exclude(pk=player.pk))
+
+
+def test_lover_from_another_game_is_rejected(admin_client):
+    game, other = _two_games(admin_client)
+    player = game.players.first()
+    stranger = other.players.first()
+    resp = admin_client.post(
+        f"/admin/werewolf/player/{player.pk}/change/",
+        {
+            "game": game.pk,
+            "character": player.character_id,
+            "seat": player.seat,
+            "role": player.role,
+            "alive": "on",
+            "lover": stranger.pk,
+        },
+    )
+    assert resp.status_code == 200
+    assert "lover" in resp.context["adminform"].form.errors
+    player.refresh_from_db()
+    assert player.lover_id != stranger.pk
+
+
+def test_lover_check_uses_the_submitted_game(admin_client):
+    game, other = _two_games(admin_client)
+    player = game.players.first()
+    resp = admin_client.post(
+        f"/admin/werewolf/player/{player.pk}/change/",
+        {
+            "game": other.pk,
+            "character": player.character_id,
+            "seat": 99,
+            "role": player.role,
+            "lover": game.players.last().pk,
+        },
+    )
+    assert resp.status_code == 200
+    errors = resp.context["adminform"].form.errors["lover"]
+    assert "A lover must be in the same game." in errors

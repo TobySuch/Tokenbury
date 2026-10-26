@@ -22,8 +22,34 @@ class CharacterAdmin(admin.ModelAdmin):
     list_display = ("name", "talkativeness")
 
 
+class PlayerForm(forms.ModelForm):
+    """Only offer the player's fellow players in the same game as a lover."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "lover" in self.fields and self.instance.game_id:
+            self.fields["lover"].queryset = (
+                Player.objects
+                .filter(game_id=self.instance.game_id)
+                .exclude(pk=self.instance.pk)
+                .select_related("character")
+            )
+
+    def clean(self):
+        cleaned = super().clean()
+        lover = cleaned.get("lover")
+        game = cleaned.get("game")
+        game_id = game.pk if game else self.instance.game_id
+        if lover and lover.game_id != game_id:
+            self.add_error("lover", "A lover must be in the same game.")
+        elif lover and self.instance.pk and lover.pk == self.instance.pk:
+            self.add_error("lover", "A player can't be their own lover.")
+        return cleaned
+
+
 class PlayerInline(admin.TabularInline):
     model = Player
+    form = PlayerForm
     extra = 0
     raw_id_fields = ("character",)
 
@@ -146,6 +172,7 @@ class GameAdmin(admin.ModelAdmin):
 
 @admin.register(Player)
 class PlayerAdmin(admin.ModelAdmin):
+    form = PlayerForm
     list_display = ("game", "seat", "character", "role", "alive", "wolf_label")
     list_filter = ("game", "role", "alive")
     raw_id_fields = ("game", "character")
