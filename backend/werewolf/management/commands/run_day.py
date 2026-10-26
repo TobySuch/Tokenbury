@@ -16,7 +16,7 @@ def now_local():
 
 
 class Command(BaseCommand):
-    help = "Play one night and day of a werewolf game."
+    help = "Play one night and day of each published active werewolf game."
 
     def add_arguments(self, parser):
         parser.add_argument("--game", type=int, default=None, help="Game id")
@@ -52,17 +52,16 @@ class Command(BaseCommand):
             fcntl.flock(lock_fd, fcntl.LOCK_UN)
             lock_fd.close()
 
-    def _find_game(self, game_id):
+    def _find_games(self, game_id):
         if game_id is not None:
             try:
-                return Game.objects.get(pk=game_id)
+                return [Game.objects.get(pk=game_id)]
             except Game.DoesNotExist:
                 raise CommandError(f"Game {game_id} does not exist") from None
-        return (
-            Game.objects
-            .filter(status=Game.Status.ACTIVE, published=True)
-            .order_by("-id")
-            .first()
+        return list(
+            Game.objects.filter(status=Game.Status.ACTIVE, published=True).order_by(
+                "id"
+            )
         )
 
     def _day_completed_today(self, game) -> bool:
@@ -80,20 +79,25 @@ class Command(BaseCommand):
         )
 
     def _run(self, options):
-        game = self._find_game(options["game"])
-        if game is None:
+        games = self._find_games(options["game"])
+        if not games:
             self.stdout.write("No published active game to run.")
             return
+        if options["if_due"] and now_local().hour < settings.WEREWOLF_RUN_HOUR:
+            self.stdout.write("Not due yet: before the run hour.")
+            return
+        for game in games:
+            self._run_game(game, options)
+
+    def _run_game(self, game, options):
         if game.status != Game.Status.ACTIVE:
             self.stdout.write(f"Game {game.pk} is {game.status}; nothing to run.")
             return
-        if options["if_due"]:
-            if now_local().hour < settings.WEREWOLF_RUN_HOUR:
-                self.stdout.write("Not due yet: before the run hour.")
-                return
-            if self._day_completed_today(game):
-                self.stdout.write("Not due: a day has already been completed today.")
-                return
+        if options["if_due"] and self._day_completed_today(game):
+            self.stdout.write(
+                f"Game {game.pk} not due: a day has already been completed today."
+            )
+            return
 
         provider = ScriptedProvider(game) if options["scripted"] else LLMProvider(game)
         while True:

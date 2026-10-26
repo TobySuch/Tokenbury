@@ -317,6 +317,49 @@ describe('sidebar', () => {
   })
 })
 
+describe('game tabs', () => {
+  const GAMES = [
+    { id: 9, status: 'active', winner: null },
+    { id: 3, status: 'finished', winner: 'wolves' },
+  ]
+  const tab = (id) => screen.getByTestId(`game-tab-${id}`)
+
+  test('/werewolf shows a tab per game and selects the newest', async () => {
+    mockApi({ games: GAMES })
+    await renderPage('/werewolf')
+    expect(screen.getAllByRole('tab')).toHaveLength(2)
+    expect(tab(9)).toHaveAttribute('aria-selected', 'true')
+    expect(tab(3)).toHaveAttribute('aria-selected', 'false')
+    expect(tab(9)).toHaveTextContent('Game 2')
+    expect(tab(3)).toHaveTextContent('Game 1')
+  })
+
+  test('tabs show Live for an active game and the result for a finished one', async () => {
+    mockApi({ games: GAMES })
+    await renderPage('/werewolf')
+    expect(within(tab(9)).getByText('Live')).toBeInTheDocument()
+    expect(within(tab(3)).getByText('Wolves won')).toBeInTheDocument()
+  })
+
+  test('clicking an older tab loads that game', async () => {
+    mockApi({ games: GAMES })
+    await renderPage('/werewolf')
+    await act(async () => {
+      fireEvent.click(tab(3))
+    })
+    expect(tab(3)).toHaveAttribute('aria-selected', 'true')
+    const urls = globalThis.fetch.mock.calls.map((c) => c[0])
+    expect(urls).toContain('/api/werewolf/games/3/beats/')
+  })
+
+  test('a direct link to an older game selects its tab', async () => {
+    mockApi({ games: GAMES })
+    await renderPage('/werewolf/3')
+    expect(tab(3)).toHaveAttribute('aria-selected', 'true')
+    expect(tab(9)).toHaveAttribute('aria-selected', 'false')
+  })
+})
+
 describe('winnerText', () => {
   test.each([
     ['wolves', 'The wolves win'],

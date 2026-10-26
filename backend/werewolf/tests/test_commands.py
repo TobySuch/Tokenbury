@@ -114,7 +114,7 @@ def test_run_day_scripted_until_over_finishes_game(db, capsys):
     assert "calls" in out.lower()
 
 
-def test_run_day_plays_one_day_by_default_on_latest_active(db):
+def test_run_day_skips_finished_games(db):
     make_characters(7)
     old = create_classic_game(seed=1, published=True)
     old.status = "finished"
@@ -125,6 +125,35 @@ def test_run_day_plays_one_day_by_default_on_latest_active(db):
     assert game.day_number == 2 and game.phase == "night_wolf_chat"
     old.refresh_from_db()
     assert not GameEvent.objects.filter(game=old, type="wolf_message").exists()
+
+
+def test_run_day_default_runs_all_published_active_games(db):
+    make_characters(7)
+    finished = create_classic_game(seed=1, published=True)
+    finished.status = "finished"
+    finished.save()
+    first = create_classic_game(seed=2, published=True)
+    second = create_classic_game(seed=3, published=True)
+    call_command("run_day", "--scripted")
+    for game in (first, second):
+        game.refresh_from_db()
+        assert game.day_number == 2 and game.phase == "night_wolf_chat"
+    assert not GameEvent.objects.filter(game=finished, type="wolf_message").exists()
+
+
+def test_if_due_is_checked_per_game(db, monkeypatch, settings, capsys):
+    settings.WEREWOLF_RUN_HOUR = 9
+    make_characters(7)
+    played = create_classic_game(seed=2, published=True)
+    at_hour(monkeypatch, 10)
+    call_command("run_day", "--scripted", "--if-due")
+    fresh = create_classic_game(seed=3, published=True)
+    call_command("run_day", "--scripted", "--if-due")
+    played.refresh_from_db()
+    fresh.refresh_from_db()
+    assert played.day_number == 2
+    assert fresh.day_number == 2
+    assert f"game {played.pk} not due" in capsys.readouterr().out.lower()
 
 
 def test_run_day_game_option(db):
