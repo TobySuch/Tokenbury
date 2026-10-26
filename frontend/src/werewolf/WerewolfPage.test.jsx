@@ -324,10 +324,13 @@ describe('game tabs', () => {
   ]
   const tab = (id) => screen.getByTestId(`game-tab-${id}`)
 
-  test('/werewolf shows a tab per game and selects the newest', async () => {
+  test('/werewolf shows a tab per game, oldest first, and selects the newest', async () => {
     mockApi({ games: GAMES })
     await renderPage('/werewolf')
-    expect(screen.getAllByRole('tab')).toHaveLength(2)
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      expect.stringContaining('Game 1'),
+      expect.stringContaining('Game 2'),
+    ])
     expect(tab(9)).toHaveAttribute('aria-selected', 'true')
     expect(tab(3)).toHaveAttribute('aria-selected', 'false')
     expect(tab(9)).toHaveTextContent('Game 2')

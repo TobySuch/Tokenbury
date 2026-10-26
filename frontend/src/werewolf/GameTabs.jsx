@@ -14,8 +14,7 @@ function status(game) {
   return null
 }
 
-// One tab per published game, newest first. Games arrive newest first; numbering
-// counts up from the oldest so it reads like a series.
+// One tab per published game, oldest on the left. Games arrive newest first.
 export default function GameTabs({ games, selectedId }) {
   return (
     <nav className="border-b border-rule bg-paper px-4">
@@ -24,7 +23,7 @@ export default function GameTabs({ games, selectedId }) {
         aria-label="Games"
         className="mx-auto flex max-w-6xl gap-1 overflow-x-auto pt-2"
       >
-        {games.map((game, i) => {
+        {[...games].reverse().map((game, i) => {
           const selected = game.id === selectedId
           return (
             <Link
@@ -32,6 +31,12 @@ export default function GameTabs({ games, selectedId }) {
               to={`/werewolf/${game.id}`}
               role="tab"
               aria-selected={selected}
+              // Keep the selected (usually newest, rightmost) tab visible when the bar scrolls.
+              ref={
+                selected
+                  ? (el) => el?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+                  : undefined
+              }
               data-testid={`game-tab-${game.id}`}
               className={`-mb-px flex shrink-0 items-center gap-2 rounded-t-lg border px-4 py-2 font-semibold whitespace-nowrap transition-colors ${
                 selected
@@ -39,7 +44,7 @@ export default function GameTabs({ games, selectedId }) {
                   : 'border-transparent text-ink-muted hover:bg-paper-hover hover:text-ink'
               }`}
             >
-              Game {games.length - i}
+              Game {i + 1}
               {status(game)}
             </Link>
           )
