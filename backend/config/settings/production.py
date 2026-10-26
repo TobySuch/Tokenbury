@@ -24,6 +24,20 @@ CSRF_TRUSTED_ORIGINS = [
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# Hashed filenames let WhiteNoise serve static files as immutable.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    },
+}
+
+# JSON only, so a cached response can never be the browsable-API HTML page.
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,
+    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+}
+
 db_option = os.environ.get("DATABASE", "sqlite").lower()
 if db_option == "postgres":
     required = {

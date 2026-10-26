@@ -571,3 +571,93 @@ def test_banner_without_site_param_is_the_town_banner(client):
 @pytest.mark.django_db
 def test_banner_unknown_site_is_a_bad_request(client):
     assert client.get("/api/banner/?site=mars").status_code == 400
+
+
+# --- caching ---
+
+LIVE_CACHE = "public, max-age=10, s-maxage=10"
+IMMUTABLE_CACHE = "public, max-age=86400, s-maxage=86400"
+
+
+def make_tick_with_state(in_game_time="2024-01-01T09:00:00Z", active=True):
+    tick = make_tick(in_game_time, active=active)
+    AgentTick.objects.create(
+        agent=make_agent(),
+        tick=tick,
+        location=make_location(),
+        activity="Having coffee",
+        inner_thought="Feeling peaceful",
+        mood="content",
+        raw_prompts={"step": "a very long prompt"},
+    )
+    return tick
+
+
+@pytest.mark.django_db
+def test_active_tick_detail_is_cached_and_immutable(client, django_assert_num_queries):
+    tick = make_tick_with_state()
+    url = f"/api/ticks/{tick.pk}/"
+    first = client.get(url)
+    assert first["Cache-Control"] == IMMUTABLE_CACHE
+    assert "Cookie" not in first.get("Vary", "")
+    AgentTick.objects.filter(tick=tick).update(activity="Rewritten")
+    with django_assert_num_queries(1):
+        second = client.get(url)
+    assert second.json() == first.json()
+
+
+@pytest.mark.django_db
+def test_tick_detail_skips_raw_llm_blobs(client, django_assert_max_num_queries):
+    tick = make_tick_with_state()
+    with django_assert_max_num_queries(4) as captured:
+        client.get(f"/api/ticks/{tick.pk}/")
+    sql = " ".join(q["sql"] for q in captured.captured_queries)
+    assert "raw_prompts" not in sql and "raw_responses" not in sql
+
+
+@pytest.mark.django_db
+def test_inactive_tick_detail_is_not_cached(client):
+    tick = make_tick_with_state(active=False)
+    url = f"/api/ticks/{tick.pk}/"
+    assert client.get(url)["Cache-Control"] == LIVE_CACHE
+    AgentTick.objects.filter(tick=tick).update(activity="Still running")
+    state = client.get(url).json()["agent_states"][0]
+    assert state["activity"] == "Still running"
+
+
+@pytest.mark.django_db
+def test_tick_latest_shares_the_tick_cache(client, django_assert_num_queries):
+    tick = make_tick_with_state()
+    detail = client.get(f"/api/ticks/{tick.pk}/").json()
+    # instance + latest id; the body comes from the tick detail cache
+    with django_assert_num_queries(2):
+        latest = client.get("/api/ticks/latest/")
+    assert latest.json() == detail
+    assert latest["Cache-Control"] == LIVE_CACHE
+
+
+@pytest.mark.django_db
+def test_tick_list_past_days_are_immutable(client):
+    make_tick("2024-01-01T09:00:00Z", active=True)
+    make_tick("2024-01-02T09:00:00Z", active=True)
+    past = client.get("/api/ticks/?date=2024-01-01")
+    assert past["Cache-Control"] == IMMUTABLE_CACHE
+    assert client.get("/api/ticks/?date=2024-01-02")["Cache-Control"] == LIVE_CACHE
+    assert client.get("/api/ticks/")["Cache-Control"] == LIVE_CACHE
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "url", ["/api/instance/", "/api/locations/", "/api/ticks/days/", "/api/banner/"]
+)
+def test_live_endpoints_have_short_public_cache(client, url):
+    make_instance()
+    Banner.objects.create(text="Hello", active=True)
+    assert client.get(url)["Cache-Control"] == LIVE_CACHE
+
+
+@pytest.mark.django_db
+def test_admin_and_errors_are_never_publicly_cached(client):
+    assert "public" not in client.get("/admin/login/").get("Cache-Control", "")
+    assert "Cache-Control" not in client.get("/api/ticks/999/")
+    assert "Cache-Control" not in client.get("/api/health/")

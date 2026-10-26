@@ -6,6 +6,14 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
 
+  valkey:
+    image: valkey/valkey:8-alpine
+    # Pure cache: bounded memory, no persistence
+    command: >
+      valkey-server --maxmemory 64mb --maxmemory-policy allkeys-lru
+      --save "" --appendonly no
+    restart: unless-stopped
+
   backend:
     image: ghcr.io/tobysuch/tokenbury:latest
     env_file: .env
@@ -14,6 +22,7 @@ services:
       - frontend_dist:/srv
     depends_on:
       - db
+      - valkey
     restart: unless-stopped
 
   ticker:
@@ -22,6 +31,7 @@ services:
     entrypoint: ./ticker_entrypoint.sh
     depends_on:
       - db
+      - valkey
     restart: unless-stopped
     profiles:
       - ticker
@@ -32,6 +42,7 @@ services:
     entrypoint: ./werewolf_entrypoint.sh
     depends_on:
       - db
+      - valkey
     restart: unless-stopped
     profiles:
       - werewolf
