@@ -1,7 +1,11 @@
+from unittest import mock
+
 import pytest
+from redis.exceptions import ConnectionError as RedisConnectionError
 from rest_framework.test import APIClient
 
-from werewolf.models import Game, PlayerNotes
+from werewolf.events import append_event
+from werewolf.models import PUBLIC, Game, PlayerNotes
 from werewolf.setup import create_game
 from werewolf.tests.factories import create_classic_game, make_characters
 
@@ -115,3 +119,51 @@ def test_players_lover_id_symmetric(client):
     assert len(paired) == 2
     for d in paired:
         assert by_id[d["lover_id"]]["lover_id"] == d["id"]
+
+
+def test_beats_cached_until_a_new_event(client, game, django_assert_num_queries):
+    from werewolf.engine import ScriptedProvider, run_day
+
+    run_day(game, ScriptedProvider(game))
+    url = f"/api/werewolf/games/{game.id}/beats/"
+    first = client.get(url).json()
+    # game lookup + max seq only: the replay comes from the cache
+    with django_assert_num_queries(2):
+        assert client.get(url).json() == first
+    append_event(
+        game, type="speech", visibility=PUBLIC, actor=game.players.first(),
+        payload={"message": "Fresh news"},
+    )  # fmt: skip
+    beats = client.get(url).json()
+    assert len(beats) == len(first) + 1
+    assert beats[-1]["text"] == "Fresh news"
+    assert client.get(url + f"?after={len(first) - 1}").json() == beats[-1:]
+
+
+def test_beats_survive_a_cache_outage(client, game):
+    url = f"/api/werewolf/games/{game.id}/beats/"
+    with mock.patch("config.cache.cache.get", side_effect=RedisConnectionError("down")):
+        resp = client.get(url)
+    assert resp.status_code == 200 and resp.json()[0]["index"] == 0
+
+
+@pytest.mark.parametrize(
+    "path", ["", "players/", "beats/", "notes/?player={player}&at=1"]
+)
+def test_game_cache_headers_follow_status(client, game, path):
+    url = f"/api/werewolf/games/{game.id}/" + path.format(
+        player=game.players.first().id
+    )
+    resp = client.get(url)
+    assert resp["Cache-Control"] == "public, max-age=10, s-maxage=10"
+    assert "Cookie" not in resp.get("Vary", "")
+    Game.objects.filter(pk=game.pk).update(status=Game.Status.FINISHED)
+    resp = client.get(url)
+    assert resp["Cache-Control"] == "public, max-age=86400, s-maxage=86400"
+
+
+def test_errors_are_not_publicly_cached(client, game):
+    assert "Cache-Control" not in client.get("/api/werewolf/games/9999/")
+    assert "Cache-Control" not in client.get(
+        f"/api/werewolf/games/{game.id}/beats/?after=abc"
+    )

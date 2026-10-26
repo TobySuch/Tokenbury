@@ -298,6 +298,21 @@ def test_scripted_full_default_game():
             assert not shrunk
 
 
+def test_skipping_non_beat_events_changes_nothing(
+    monkeypatch, django_assert_num_queries
+):
+    make_characters(9)
+    game = create_game(seed=5, config={"player_count": 9})
+    provider = ScriptedProvider(game)
+    while game.status == Game.Status.ACTIVE:
+        run_day(game, provider)
+        game.refresh_from_db()
+    with django_assert_num_queries(2):
+        filtered = build_beats(game)
+    monkeypatch.setattr("werewolf.beats.BEAT_EVENT_TYPES", set(GameEvent.Type.values))
+    assert filtered == build_beats(game)
+
+
 def test_unknown_death_cause_is_a_generic_day_beat():
     game = new_game()
     victim = game.players.exclude(role="wolf").first()

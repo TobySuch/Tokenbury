@@ -105,6 +105,9 @@ make prod-down
 | `SQL_DATABASE` | Yes | Must match `POSTGRES_DB` |
 | `SQL_USER` | Yes | Must match `POSTGRES_USER` |
 | `SQL_PASSWORD` | Yes | Must match `POSTGRES_PASSWORD` |
+| `CACHE` | No | `valkey` to use the `valkey` service as Django's cache. Default `locmem` (in-process, fine for a single backend process) |
+| `VALKEY_HOST` | No | Valkey host when `CACHE=valkey`. Default `valkey` |
+| `VALKEY_PORT` | No | Valkey port when `CACHE=valkey`. Default `6379` |
 | `CORS_ALLOWED_ORIGINS` | No | Comma-separated CORS origins if frontend is on a different domain |
 | `CSRF_TRUSTED_ORIGINS` | No | Comma-separated origins trusted for CSRF (e.g. `https://yourdomain.com`), needed for admin logins over HTTPS behind the proxy |
 | `LLM_MODEL` | No | Town simulation model. Default `anthropic/claude-haiku-4-5` |
@@ -118,6 +121,12 @@ make prod-down
 | `WEREWOLF_RUN_HOUR` | No | Hour (UTC) after which the werewolf runner plays each day. Default `0` (midnight) |
 | `WEREWOLF_POLL_INTERVAL_MINUTES` | No | How often the werewolf runner checks whether a day is due. Default `15` |
 | `PLAUSIBLE_DOMAIN`, `PLAUSIBLE_URL` | No | Read by Caddy when serving `index.html`. If both are set, the Plausible script `${PLAUSIBLE_URL}/js/script.js` is added for `PLAUSIBLE_DOMAIN`. Set them on the `caddy` service |
+
+### Caching
+
+Public API responses send `Cache-Control` headers: about 10 seconds for live data, and a day for data that can't change (completed ticks, past days, finished werewolf games). Admin pages and error responses are never publicly cached. Caddy adds long-lived headers for hashed frontend bundles and media. To let Cloudflare cache the JSON API, add a Cache Rule for `/api/*` set to "Eligible for cache" that respects origin headers.
+
+The heavy responses (werewolf beats, tick detail) are also cached server-side in Valkey. Their keys include the latest event seq or tick id, so nothing needs invalidating, and a Valkey outage just falls back to the database.
 
 ### HTTPS
 

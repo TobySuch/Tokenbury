@@ -35,6 +35,21 @@ DEATH_BEATS = {
 }
 
 
+# Event types that produce a beat, plus role_assigned for the opening beat.
+BEAT_EVENT_TYPES = {
+    "role_assigned",
+    "phase_change",
+    "wolf_message",
+    "protect",
+    "lover_message",
+    "peaceful_night",
+    "speech",
+    "death",
+    "vote_result",
+    "game_over",
+}
+
+
 def _banner(phase, day):
     template = BANNERS.get(phase)
     return template.format(day=day) if template else ""
@@ -45,9 +60,14 @@ def _palette(phase):
 
 
 def build_beats(game) -> list[dict]:
-    players = {p.id: p for p in game.players.all()}
+    players = {p.id: p for p in game.players.select_related("character")}
     alive = [p.id for p in sorted(players.values(), key=lambda p: p.seat)]
-    events = list(GameEvent.objects.filter(game=game).order_by("seq"))
+    events = list(
+        GameEvent.objects
+        .filter(game=game, type__in=BEAT_EVENT_TYPES)
+        .only("seq", "day", "type", "actor_id", "payload")
+        .order_by("seq")
+    )
 
     state = {"day": 1, "phase": Phase.NIGHT_WOLF_CHAT}
     beats: list[dict] = []

@@ -6,6 +6,11 @@
 		reverse_proxy backend:8000
 	}
 	handle /media/* {
+		# Re-uploads get a new filename, so media URLs rarely change
+		header {
+			Cache-Control "public, max-age=604800"
+			match status 200
+		}
 		reverse_proxy backend:8000
 	}
 	handle /static/* {
@@ -13,6 +18,27 @@
 	}
 	handle {
 		root * /srv
+
+		# Vite bundles carry a content hash in the filename
+		@hashed path_regexp ^/assets/.+-[A-Za-z0-9_-]{8}\.(js|css)$
+		header @hashed {
+			Cache-Control "public, max-age=31536000, immutable"
+			match status 200
+		}
+
+		@public_asset {
+			path /assets/*
+			not path_regexp ^/assets/.+-[A-Za-z0-9_-]{8}\.(js|css)$
+		}
+		header @public_asset {
+			Cache-Control "public, max-age=86400"
+			match status 200
+		}
+
+		# index.html (and every SPA route) must revalidate so deploys show up
+		@page not path /assets/*
+		header @page Cache-Control "no-cache"
+
 		try_files {path} /index.html
 		templates
 		file_server

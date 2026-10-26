@@ -1,7 +1,10 @@
+from django.db.models import Max
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from config.cache import cached
+from config.http import IMMUTABLE, LIVE, cache_public
 from werewolf.beats import build_beats
 from werewolf.models import Game
 from werewolf.notes import notes_as_of
@@ -23,10 +26,14 @@ def _game_or_404(pk):
     return _published().filter(pk=pk).first()
 
 
+def _max_age(game):
+    return IMMUTABLE if game.status == Game.Status.FINISHED else LIVE
+
+
 @api_view(["GET"])
 def game_list(request):
     games = _published().order_by("-created_at", "-id")
-    return Response(GameSerializer(games, many=True).data)
+    return cache_public(Response(GameSerializer(games, many=True).data), LIVE)
 
 
 @api_view(["GET"])
@@ -34,7 +41,7 @@ def game_detail(request, pk):
     game = _game_or_404(pk)
     if game is None:
         return Response(status=status.HTTP_404_NOT_FOUND)
-    return Response(GameSerializer(game).data)
+    return cache_public(Response(GameSerializer(game).data), _max_age(game))
 
 
 @api_view(["GET"])
@@ -43,8 +50,11 @@ def game_players(request, pk):
     if game is None:
         return Response(status=status.HTTP_404_NOT_FOUND)
     players = game.players.select_related("character").order_by("seat")
-    return Response(
-        PlayerSerializer(players, many=True, context={"request": request}).data
+    return cache_public(
+        Response(
+            PlayerSerializer(players, many=True, context={"request": request}).data
+        ),
+        _max_age(game),
     )
 
 
@@ -61,7 +71,14 @@ def game_beats(request, pk):
                 {"detail": "after must be an integer"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-    return Response([b for b in build_beats(game) if b["index"] > after])
+    # The log is append-only, so its max seq versions the replay.
+    last_seq = game.events.aggregate(m=Max("seq"))["m"] or 0
+    beats = cached(
+        f"ww:beats:{game.pk}:{last_seq}", IMMUTABLE, lambda: build_beats(game)
+    )
+    return cache_public(
+        Response([b for b in beats if b["index"] > after]), _max_age(game)
+    )
 
 
 @api_view(["GET"])
@@ -81,10 +98,12 @@ def game_notes(request, pk):
         return Response(status=status.HTTP_404_NOT_FOUND)
     notes = notes_as_of(player, at)
     if notes is None:
-        return Response({"player_id": player.id, "version": 0, "text": "", "at_seq": 0})
-    return Response({
-        "player_id": player.id,
-        "version": notes.version,
-        "text": notes.text,
-        "at_seq": notes.at_seq,
-    })
+        data = {"player_id": player.id, "version": 0, "text": "", "at_seq": 0}
+    else:
+        data = {
+            "player_id": player.id,
+            "version": notes.version,
+            "text": notes.text,
+            "at_seq": notes.at_seq,
+        }
+    return cache_public(Response(data), _max_age(game))

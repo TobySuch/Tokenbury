@@ -1,10 +1,13 @@
 from django.conf import settings
+from django.db.models import Prefetch
 from django.utils import timezone as tz
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from world.models import Agent, Banner, Instance, Location, Tick
+from config.cache import cached
+from config.http import IMMUTABLE, LIVE, cache_public
+from world.models import Agent, AgentTick, Banner, Instance, Location, Tick
 from world.serializers import (
     AgentDetailSerializer,
     BannerSerializer,
@@ -25,6 +28,24 @@ def _apply_live_filter(qs):
     return qs
 
 
+def _tick_detail_data(pk):
+    # raw_prompts/raw_responses are large debug blobs the serializer never uses.
+    agent_states = AgentTick.objects.defer(
+        "raw_prompts", "raw_responses"
+    ).select_related("agent", "location")
+    tick = Tick.objects.prefetch_related(
+        Prefetch("agent_states", queryset=agent_states)
+    ).get(pk=pk)
+    return TickDetailSerializer(tick).data
+
+
+def _cached_tick_detail(tick):
+    """Serialise a tick, caching it once it is active and so immutable."""
+    if not tick.active:
+        return _tick_detail_data(tick.pk)
+    return cached(f"tick:{tick.pk}", IMMUTABLE, lambda: _tick_detail_data(tick.pk))
+
+
 @api_view(["GET"])
 def health(request):
     return Response({"status": "ok", "message": "Tokenbury is alive 🌊"})
@@ -35,7 +56,10 @@ def active_instance(request):
     instance = _active_instance()
     if instance is None:
         return Response(status=status.HTTP_404_NOT_FOUND)
-    return Response(InstanceSerializer(instance, context={"request": request}).data)
+    return cache_public(
+        Response(InstanceSerializer(instance, context={"request": request}).data),
+        LIVE,
+    )
 
 
 @api_view(["GET"])
@@ -51,7 +75,7 @@ def active_banner(request):
     ).first()
     if banner is None:
         return Response(status=status.HTTP_404_NOT_FOUND)
-    return Response(BannerSerializer(banner).data)
+    return cache_public(Response(BannerSerializer(banner).data), LIVE)
 
 
 @api_view(["GET"])
@@ -60,7 +84,7 @@ def agent_detail(request, pk):
         agent = Agent.objects.get(pk=pk)
     except Agent.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
-    return Response(AgentDetailSerializer(agent).data)
+    return cache_public(Response(AgentDetailSerializer(agent).data), LIVE)
 
 
 @api_view(["GET"])
@@ -71,7 +95,7 @@ def locations(request):
         if instance
         else Location.objects.none()
     )
-    return Response(LocationSerializer(qs, many=True).data)
+    return cache_public(Response(LocationSerializer(qs, many=True).data), LIVE)
 
 
 @api_view(["GET"])
@@ -80,9 +104,13 @@ def tick_list(request):
     qs = Tick.objects.filter(instance=instance) if instance else Tick.objects.none()
     qs = _apply_live_filter(qs)
     date_str = request.query_params.get("date")
+    max_age = LIVE
     if date_str:
+        latest = qs.filter(active=True).only("in_game_time").first()
+        if latest and date_str < latest.in_game_time.date().isoformat():
+            max_age = IMMUTABLE
         qs = qs.filter(in_game_time__date=date_str)
-    return Response(TickListSerializer(qs, many=True).data)
+    return cache_public(Response(TickListSerializer(qs, many=True).data), max_age)
 
 
 @api_view(["GET"])
@@ -91,19 +119,17 @@ def tick_days(request):
     qs = Tick.objects.filter(instance=instance) if instance else Tick.objects.none()
     qs = _apply_live_filter(qs)
     dates = qs.dates("in_game_time", "day", order="ASC")
-    return Response([d.isoformat() for d in dates])
+    return cache_public(Response([d.isoformat() for d in dates]), LIVE)
 
 
 @api_view(["GET"])
 def tick_detail(request, pk):
-    qs = _apply_live_filter(
-        Tick.objects.prefetch_related("agent_states__agent", "agent_states__location")
-    )
-    try:
-        tick = qs.get(pk=pk)
-    except Tick.DoesNotExist:
+    tick = _apply_live_filter(Tick.objects.only("id", "active")).filter(pk=pk).first()
+    if tick is None:
         return Response(status=status.HTTP_404_NOT_FOUND)
-    return Response(TickDetailSerializer(tick).data)
+    return cache_public(
+        Response(_cached_tick_detail(tick)), IMMUTABLE if tick.active else LIVE
+    )
 
 
 @api_view(["GET"])
@@ -113,7 +139,7 @@ def tick_latest(request):
     if instance:
         qs = qs.filter(instance=instance)
     qs = _apply_live_filter(qs)
-    latest = qs.only("id").first()
+    latest = qs.only("id", "active").first()
     if latest is None:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -125,7 +151,4 @@ def tick_latest(request):
         except ValueError:
             pass
 
-    tick = Tick.objects.prefetch_related(
-        "agent_states__agent", "agent_states__location"
-    ).get(pk=latest.id)
-    return Response(TickDetailSerializer(tick).data)
+    return cache_public(Response(_cached_tick_detail(latest)), LIVE)
