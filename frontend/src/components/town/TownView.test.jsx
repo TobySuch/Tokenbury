@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen, fireEvent } from '@testing-library/react'
 import TownView from './TownView'
 
 const INSTANCE = { name: 'Tokenbury', slug: 'tokenbury', map_image_url: '/media/maps/town.png' }
@@ -194,4 +194,20 @@ test('sprites update when tickData prop changes', () => {
 
   expect(screen.getByAltText('Margaret')).toBeInTheDocument()
   expect(screen.queryByText('D')).not.toBeInTheDocument()
+})
+
+test('deselect clears a tapped agent and its sticky hover', () => {
+  const onAgentChange = vi.fn()
+  const ref = { current: null }
+  renderAndLoad({ tickData: TICK_WITH_AGENTS, onAgentChange, ref })
+  const sprite = screen.getByAltText('Margaret')
+  fireEvent.mouseEnter(sprite)
+  fireEvent.click(sprite)
+  expect(onAgentChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({ agent_name: 'Margaret' })
+  )
+  act(() => ref.current.deselect())
+  expect(onAgentChange).toHaveBeenLastCalledWith(null)
+  fireEvent.mouseLeave(sprite)
+  expect(onAgentChange).toHaveBeenLastCalledWith(null)
 })

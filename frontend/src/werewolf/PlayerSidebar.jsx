@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
+import CloseButton from '../components/ui/CloseButton'
 import Panel from '../components/ui/Panel'
 import Pill from '../components/ui/Pill'
 import { fetchNotes } from './api'
 
-export default function PlayerSidebar({ gameId, player, alive, seq, players = [] }) {
+export default function PlayerSidebar({ gameId, player, alive, seq, players = [], onClose }) {
   const key = player && seq != null ? `${player.id}:${seq}` : null
   const [loaded, setLoaded] = useState({ key: null, text: '' })
 
@@ -27,9 +28,18 @@ export default function PlayerSidebar({ gameId, player, alive, seq, players = []
       ) : (
         <div className="flex flex-col gap-3">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-bold italic">{player.name}</h2>
-              <Pill tone={player.role}>{player.role}</Pill>
+            <div className="flex items-start gap-2">
+              <div className="flex flex-1 flex-wrap items-center gap-2">
+                <h2 className="text-xl font-bold italic">{player.name}</h2>
+                <Pill tone={player.role}>{player.role}</Pill>
+              </div>
+              {onClose && (
+                <CloseButton
+                  label={`Deselect ${player.name}`}
+                  onClick={onClose}
+                  className="-mr-2 -mt-2"
+                />
+              )}
             </div>
             <p className="mt-1 text-sm text-ink-muted">
               {player.wolf_label ? `${player.wolf_label} · ` : ''}

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { fetchAgentDetail } from '../../api/client'
+import CloseButton from '../ui/CloseButton'
 import Pill from '../ui/Pill'
 
-export default function AgentPanel({ agent }) {
+export default function AgentPanel({ agent, onClose }) {
   const [detail, setDetail] = useState(null)
 
   useEffect(() => {
@@ -26,9 +27,18 @@ export default function AgentPanel({ agent }) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <div className="flex items-center gap-2">
-          <h2 className="text-xl font-bold italic">{agent.agent_name}</h2>
-          {agent.mood && <Pill>{agent.mood}</Pill>}
+        <div className="flex items-start gap-2">
+          <div className="flex flex-1 flex-wrap items-center gap-2">
+            <h2 className="text-xl font-bold italic">{agent.agent_name}</h2>
+            {agent.mood && <Pill>{agent.mood}</Pill>}
+          </div>
+          {onClose && (
+            <CloseButton
+              label={`Deselect ${agent.agent_name}`}
+              onClick={onClose}
+              className="-mr-2 -mt-2"
+            />
+          )}
         </div>
         {detail?.bio && <p className="mt-0.5 text-xs italic text-ink-faint">{detail.bio}</p>}
         {agent.location_name && (

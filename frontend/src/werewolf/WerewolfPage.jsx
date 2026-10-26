@@ -59,6 +59,11 @@ function Spectator({ gameId, game, beats, players }) {
             alive={focused ? aliveIds.has(focused.id) : false}
             seq={beat?.seq}
             players={players}
+            onClose={() => {
+              // Touch screens leave a sticky hover behind the tap, so clear both.
+              setHoveredId(null)
+              setSelectedId(null)
+            }}
           />
         </div>
         {beats.length === 0 ? (

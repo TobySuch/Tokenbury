@@ -315,6 +315,17 @@ describe('sidebar', () => {
     expect(screen.getByTestId('player-sidebar')).toHaveTextContent('Dave')
     expect(screen.getByTestId('player-sidebar')).toHaveTextContent(/villager/i)
   })
+
+  test('the close button deselects a tapped player, even with a sticky hover', async () => {
+    mockApi()
+    await renderPage()
+    fireEvent.mouseEnter(screen.getByTestId('seat-4'))
+    fireEvent.click(screen.getByTestId('seat-4'))
+    fireEvent.click(screen.getByRole('button', { name: 'Deselect Dave' }))
+    const sidebar = screen.getByTestId('player-sidebar')
+    expect(sidebar).not.toHaveTextContent('Dave')
+    expect(sidebar).toHaveTextContent(/tap a player/i)
+  })
 })
 
 describe('game tabs', () => {

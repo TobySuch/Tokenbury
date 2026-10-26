@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useImperativeHandle } from 'react'
 import AgentSprite from '../agents/AgentSprite'
 import TickClock from './TickClock'
 
@@ -54,6 +54,7 @@ export default function TownView({
   tickData,
   onAgentChange,
   className = '',
+  ref,
 }) {
   const isDebug = new URLSearchParams(window.location.search).get('debug') === '1'
   const [naturalSize, setNaturalSize] = useState(null)
@@ -128,6 +129,17 @@ export default function TownView({
     lockedAgentRef.current = agent
     onAgentChange?.(agent)
   }
+
+  // Lets the agent panel's close button drop the tapped agent (and the sticky
+  // hover a tap leaves behind on touch screens).
+  useImperativeHandle(ref, () => ({
+    deselect() {
+      setHoveredAgent(null)
+      setLockedAgent(null)
+      lockedAgentRef.current = null
+      onAgentChange?.(null)
+    },
+  }))
 
   function handleImageLoad() {
     const img = imgRef.current
