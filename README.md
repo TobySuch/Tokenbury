@@ -121,12 +121,17 @@ make prod-down
 | `WEREWOLF_RUN_HOUR` | No | Hour (UTC) after which the werewolf runner plays each day. Default `0` (midnight) |
 | `WEREWOLF_POLL_INTERVAL_MINUTES` | No | How often the werewolf runner checks whether a day is due. Default `15` |
 | `PLAUSIBLE_DOMAIN`, `PLAUSIBLE_URL` | No | Read by Caddy when serving `index.html`. If both are set, the Plausible script `${PLAUSIBLE_URL}/js/script.js` is added for `PLAUSIBLE_DOMAIN`. Set them on the `caddy` service |
+| `SITE_URL` | No | Public origin (e.g. `https://yourdomain.com`) used by Caddy for canonical, Open Graph, `robots.txt` and `sitemap.xml` URLs. Defaults to `https://` plus the request's host. Set it on the `caddy` service |
 
 ### Caching
 
 Public API responses send `Cache-Control` headers: about 10 seconds for live data, and a day for data that can't change (completed ticks, past days, finished werewolf games). Admin pages and error responses are never publicly cached. Caddy adds long-lived headers for hashed frontend bundles and media. To let Cloudflare cache the JSON API, add a Cache Rule for `/api/*` set to "Eligible for cache" that respects origin headers.
 
 The heavy responses (werewolf beats, tick detail) are also cached server-side in Valkey. Their keys include the latest event seq or tick id, so nothing needs invalidating, and a Valkey outage just falls back to the database.
+
+### SEO
+
+Caddy renders `index.html`, `robots.txt` and `sitemap.xml` as templates, so each route gets its own title, description, canonical URL and Open Graph tags without the hostname living in the repo. Unknown paths get `noindex`. Page titles live in two places: `frontend/index.html` (for crawlers and link previews) and each page's `usePageTitle` call (for in-app navigation). Keep them in sync. Once deployed, submit `/sitemap.xml` in Google Search Console.
 
 ### HTTPS
 

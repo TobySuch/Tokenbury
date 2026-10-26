@@ -40,7 +40,10 @@
 		header @page Cache-Control "no-cache"
 
 		try_files {path} /index.html
-		templates
+		# index.html, robots.txt and sitemap.xml are templates (env vars, request host)
+		templates {
+			mime text/html text/plain text/xml application/xml
+		}
 		file_server
 	}
 }

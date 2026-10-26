@@ -1,13 +1,41 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-GB">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/assets/favicon.png" />
-    <link rel="apple-touch-icon" href="/assets/logo.png" />
+    {{/* Rendered by Caddy templates. Keep logic inside actions: the Vite dev server strips them. */}}
+    {{ $base := env "SITE_URL" | trimSuffix "/" }}{{ if not $base }}{{ $base = printf "https://%s" .Host }}{{ end }}
+    {{ $path := .OriginalReq.URL.Path | trimSuffix "/" }}{{ if not $path }}{{ $path = "/" }}{{ end }}
+    {{ $site := "Tokenbury-on-Sea" }}{{ $image := "/assets/og-town.jpg" }}{{ $found := true }}
+    {{ $title := "Tokenbury-on-Sea: a living AI town" }}
+    {{ $desc := "A watchable AI simulation of a sleepy English seaside town. Drop in to see what the residents are up to, where they are and what they are thinking." }}
+    {{ if eq $path "/about" }}{{ $title = "About · Tokenbury-on-Sea" }}{{ $desc = "How Tokenbury-on-Sea works: AI residents with their own personalities plan their days, wander the town and think out loud every half hour." }}
+    {{ else if hasPrefix "/werewolf" $path }}{{ $site = "Tokenbury Werewolf" }}{{ $image = "/assets/og-werewolf.jpg" }}
+      {{ if eq $path "/werewolf" }}{{ $title = "Tokenbury Werewolf: AI agents play Werewolf" }}{{ $desc = "Watch the AI residents of Tokenbury-on-Sea play Werewolf: bluffing, accusing and voting each other out, one day and night at a time." }}
+      {{ else if eq $path "/werewolf/about" }}{{ $title = "About · Tokenbury Werewolf" }}{{ $desc = "The roles, rules and rounds of Tokenbury Werewolf, a social deduction game played entirely by AI characters." }}
+      {{ else if regexMatch "^/werewolf/[0-9]+$" $path }}{{ $title = "Werewolf game · Tokenbury Werewolf" }}{{ $desc = "Replay a game of Werewolf played by the AI residents of Tokenbury-on-Sea, beat by beat." }}
+      {{ else }}{{ $found = false }}{{ end }}
+    {{ else if ne $path "/" }}{{ $found = false }}{{ end }}
+    {{ if not $found }}{{ $site = "Tokenbury-on-Sea" }}{{ $title = "Page not found · Tokenbury-on-Sea" }}{{ $desc = "" }}{{ end }}
+    <title>{{ $title }}</title>
+    <meta name="description" content="{{ $desc }}" />
+    {{ if $found }}<link rel="canonical" href="{{ $base | html }}{{ $path }}" />
+    <meta property="og:url" content="{{ $base | html }}{{ $path }}" />{{ else }}<meta name="robots" content="noindex" />{{ end }}
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="{{ $site }}" />
+    <meta property="og:title" content="{{ $title }}" />
+    <meta property="og:description" content="{{ $desc }}" />
+    <meta property="og:image" content="{{ $base | html }}{{ $image }}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#faf5e4" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/assets/favicon-48.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/assets/favicon-192.png" />
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta property="og:title" content="Tokenbury-on-Sea" />
-    <meta property="og:image" content="/assets/logo.png" />
-    <title>Tokenbury-on-Sea</title>
+    <script type="application/ld+json">
+      {"@context": "https://schema.org", "@type": "WebSite", "name": "Tokenbury-on-Sea", "url": {{ printf "%s/" $base | toJson }}}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

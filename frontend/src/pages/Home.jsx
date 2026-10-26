@@ -10,6 +10,7 @@ import {
   fetchTickDays,
   fetchTickById,
 } from '../api/client'
+import usePageTitle from '../hooks/usePageTitle'
 
 function tickToDay(inGameTime) {
   return inGameTime ? inGameTime.substring(0, 10) : null
@@ -19,6 +20,7 @@ const BTN =
   'flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg border border-[#d4bc8a] bg-[#faf5e4] px-3 text-[#3d2b1f] font-semibold transition-colors hover:bg-[#f0e6c8] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer select-none'
 
 function Home() {
+  usePageTitle('Tokenbury-on-Sea: a living AI town')
   const [instance, setInstance] = useState(null)
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [locations, setLocations] = useState([])
@@ -188,6 +190,7 @@ function Home() {
 
   return (
     <main className="flex flex-1 flex-col overflow-auto lg:flex-row lg:overflow-hidden">
+      <h1 className="sr-only">Tokenbury-on-Sea</h1>
       <div className="min-w-0 p-4 lg:w-2/3 lg:flex-none">
         {/* Portrait mini nav — above map, small portrait screens only */}
         <div className="hidden max-lg:portrait:flex items-center gap-3 pb-2">

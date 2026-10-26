@@ -75,8 +75,9 @@ test('on the town site the werewolf logo sits next to the main logo with a Try: 
   expect(tryLink).toHaveAttribute('href', '/werewolf')
   expect(tryLink).toHaveTextContent('Try:')
   expect(within(tryLink).getByRole('img')).toHaveAttribute('src', '/assets/werewolf-logo.webp')
-  expect(within(header).getByRole('heading', { level: 1 })).toContainElement(
-    within(header).getByRole('img', { name: 'Tokenbury-on-Sea' })
+  expect(within(header).getByRole('link', { name: 'Tokenbury-on-Sea' })).toHaveAttribute(
+    'href',
+    '/'
   )
   // No separate Werewolf button in the header nav any more.
   expect(within(header).queryByRole('link', { name: 'Werewolf' })).toBeNull()
@@ -91,10 +92,10 @@ test('on the werewolf site the header uses the werewolf logo', async () => {
     )
   })
   const header = screen.getByRole('banner')
-  const heading = within(header).getByRole('heading', { level: 1 })
-  const logo = within(heading).getByRole('img', { name: 'Tokenbury Werewolf' })
+  const home = within(header).getByRole('link', { name: 'Tokenbury Werewolf' })
+  const logo = within(home).getByRole('img', { name: 'Tokenbury Werewolf' })
   expect(logo).toHaveAttribute('src', '/assets/werewolf-logo.webp')
-  expect(within(heading).getByRole('link')).toHaveAttribute('href', '/werewolf')
+  expect(home).toHaveAttribute('href', '/werewolf')
   const back = within(header).getByRole('link', { name: /back to.*tokenbury-on-sea/i })
   expect(back).toHaveAttribute('href', '/')
 })
@@ -158,4 +159,34 @@ test('the werewolf about page describes the current roles and variable player co
   expect(main).toHaveTextContent(/between five and twelve/i)
   expect(main).not.toHaveTextContent(/seven players/i)
   expect(main).not.toHaveTextContent(/the two wolves/i)
+})
+
+test('an unknown path shows the not found page', async () => {
+  await act(async () => {
+    render(
+      <MemoryRouter initialEntries={['/no-such-page']}>
+        <App />
+      </MemoryRouter>
+    )
+  })
+  expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument()
+  expect(document.title).toBe('Page not found · Tokenbury-on-Sea')
+})
+
+test.each([
+  ['/', 'Tokenbury-on-Sea: a living AI town'],
+  ['/about', 'About · Tokenbury-on-Sea'],
+  ['/werewolf', 'Tokenbury Werewolf: AI agents play Werewolf'],
+  ['/werewolf/about', 'About · Tokenbury Werewolf'],
+  ['/werewolf/3', 'Werewolf game · Tokenbury Werewolf'],
+])('%s has exactly one h1 and title %s', async (path, title) => {
+  await act(async () => {
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <App />
+      </MemoryRouter>
+    )
+  })
+  expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+  expect(document.title).toBe(title)
 })

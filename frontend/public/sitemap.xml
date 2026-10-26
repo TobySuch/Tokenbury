@@ -1,0 +1,8 @@
+{{ $base := env "SITE_URL" | trimSuffix "/" }}{{ if not $base }}{{ $base = printf "https://%s" .Host }}{{ end -}}
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{{ $base | html }}/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>
+  <url><loc>{{ $base | html }}/about</loc><changefreq>monthly</changefreq></url>
+  <url><loc>{{ $base | html }}/werewolf</loc><changefreq>daily</changefreq></url>
+  <url><loc>{{ $base | html }}/werewolf/about</loc><changefreq>monthly</changefreq></url>
+</urlset>

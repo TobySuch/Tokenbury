@@ -1,0 +1,6 @@
+{{ $base := env "SITE_URL" | trimSuffix "/" }}{{ if not $base }}{{ $base = printf "https://%s" .Host }}{{ end -}}
+# /api/ stays crawlable: search engines need it to render the pages.
+User-agent: *
+Disallow: /admin/
+
+Sitemap: {{ $base }}/sitemap.xml
