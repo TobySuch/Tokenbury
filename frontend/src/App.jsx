@@ -1,6 +1,7 @@
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import Home from './pages/Home'
 import About from './pages/About'
+import NotFound from './pages/NotFound'
 import WerewolfPage from './werewolf/WerewolfPage'
 import WerewolfAbout from './werewolf/WerewolfAbout'
 import Banner from './components/Banner'
@@ -28,7 +29,7 @@ function App() {
       <header className="hidden lg:flex shrink-0 items-center border-b border-[#d4bc8a] p-1">
         {onWerewolf ? (
           <>
-            <h1>
+            <div>
               <NavLink to="/werewolf" end>
                 <img
                   src="/assets/werewolf-logo.webp"
@@ -36,16 +37,16 @@ function App() {
                   className="h-28 w-auto"
                 />
               </NavLink>
-            </h1>
+            </div>
             <SiteLink to="/" label="Back to:" logo="/assets/logo.webp" alt="Tokenbury-on-Sea" />
           </>
         ) : (
           <>
-            <h1>
+            <div>
               <NavLink to="/">
                 <img src="/assets/logo.webp" alt="Tokenbury-on-Sea" className="h-28 w-auto" />
               </NavLink>
-            </h1>
+            </div>
             <SiteLink
               to="/werewolf"
               label="Try:"
@@ -73,6 +74,7 @@ function App() {
         <Route path="/werewolf" element={<WerewolfPage />} />
         <Route path="/werewolf/about" element={<WerewolfAbout />} />
         <Route path="/werewolf/:gameId" element={<WerewolfPage />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
       <Footer />
       <BottomNav />

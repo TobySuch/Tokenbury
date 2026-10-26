@@ -1,0 +1,2 @@
+# Caddy template: Prettier rewraps the {{ }} actions and splits their strings across lines
+index.html

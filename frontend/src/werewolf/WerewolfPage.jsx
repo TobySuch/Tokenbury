@@ -6,6 +6,7 @@ import PlayerCircle from './PlayerCircle'
 import PlayerSidebar from './PlayerSidebar'
 import { fetchGames, fetchPlayers } from './api'
 import { useBeats } from './useBeats'
+import usePageTitle from '../hooks/usePageTitle'
 
 function Spectator({ gameId, game, beats, players }) {
   const [follow, setFollow] = useState(() => game.status === 'active')
@@ -116,8 +117,7 @@ function GameView({ gameId }) {
   return <Spectator gameId={gameId} game={game} beats={beats} players={players} />
 }
 
-export default function WerewolfPage() {
-  const { gameId } = useParams()
+function GamePicker({ gameId }) {
   const [games, setGames] = useState(undefined)
 
   useEffect(() => {
@@ -146,6 +146,21 @@ export default function WerewolfPage() {
     <>
       {games?.length > 0 && <GameTabs games={games} selectedId={id} />}
       <GameView key={id} gameId={id} />
+    </>
+  )
+}
+
+export default function WerewolfPage() {
+  const { gameId } = useParams()
+  usePageTitle(
+    gameId != null
+      ? 'Werewolf game · Tokenbury Werewolf'
+      : 'Tokenbury Werewolf: AI agents play Werewolf'
+  )
+  return (
+    <>
+      <h1 className="sr-only">Tokenbury Werewolf</h1>
+      <GamePicker gameId={gameId} />
     </>
   )
 }

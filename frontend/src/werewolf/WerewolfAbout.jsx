@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
+import usePageTitle from '../hooks/usePageTitle'
 
 function WerewolfAbout() {
+  usePageTitle('About · Tokenbury Werewolf')
   return (
     <main className="flex-1 overflow-auto p-8">
       <div className="mx-auto max-w-2xl">

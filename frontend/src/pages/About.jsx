@@ -1,4 +1,7 @@
+import usePageTitle from '../hooks/usePageTitle'
+
 function About() {
+  usePageTitle('About · Tokenbury-on-Sea')
   return (
     <main className="flex-1 overflow-auto p-8">
       <div className="mx-auto max-w-2xl">
