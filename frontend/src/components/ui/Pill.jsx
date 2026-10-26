@@ -4,6 +4,7 @@ const TONES = {
   seer: 'border-indigo-500 bg-indigo-500 text-white',
   doctor: 'border-emerald-600 bg-emerald-600 text-white',
   villager: 'border-rule bg-chip text-ink',
+  live: 'border-green-600 bg-green-600 text-white',
 }
 
 export default function Pill({ tone = 'neutral', className = '', children, ...props }) {

@@ -135,7 +135,9 @@ A separate game in which the AI characters play Werewolf, watchable at `/werewol
 2. Create a game in the admin (Werewolf → Games → Add) or with `make werewolf-game ARGS="--seed 7"`. New games start **unpublished**, so they are hidden from the site and skipped by the scheduler.
 3. Optionally play a day by hand to check it: `make werewolf-day ARGS="--game <id>"`. Add `--scripted` to use canned actions with no LLM calls.
 4. Tick **Published** on the game in the admin, or pass `--publish` when creating it.
-5. To play one day per day automatically, enable the `werewolf` Compose profile. Each day after `WEREWOLF_RUN_HOUR` (UTC), it plays one night and day of the latest published active game.
+5. To play one day per day automatically, enable the `werewolf` Compose profile. Each day after `WEREWOLF_RUN_HOUR` (UTC), it plays one night and day of **every** published active game, one after another, so several games can run side by side.
+
+To start another game once one has finished, create and publish a new one, e.g. in production: `docker compose exec backend uv run python manage.py create_werewolf_game --publish`. The site shows a tab for each published game and opens on the newest.
 
 ### Game settings
 

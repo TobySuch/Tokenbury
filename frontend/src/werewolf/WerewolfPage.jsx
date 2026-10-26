@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import StepControls from '../components/ui/StepControls'
+import GameTabs from './GameTabs'
 import PlayerCircle from './PlayerCircle'
 import PlayerSidebar from './PlayerSidebar'
 import { fetchGames, fetchPlayers } from './api'
@@ -112,20 +113,20 @@ function GameView({ gameId }) {
 
 export default function WerewolfPage() {
   const { gameId } = useParams()
-  const [latest, setLatest] = useState(undefined)
+  const [games, setGames] = useState(undefined)
 
   useEffect(() => {
-    if (gameId) return undefined
     let cancelled = false
-    fetchGames().then((games) => {
-      if (!cancelled) setLatest(games[0]?.id ?? null)
+    fetchGames().then((data) => {
+      if (!cancelled) setGames(data)
     })
     return () => {
       cancelled = true
     }
-  }, [gameId])
+  }, [])
 
-  const id = gameId ?? latest
+  // A direct link to a game doesn't wait for the list; /werewolf shows the newest.
+  const id = gameId != null ? Number(gameId) : games && (games[0]?.id ?? null)
   if (id === undefined) {
     return <p className="flex-1 p-8 text-center italic text-ink-muted">Loading…</p>
   }
@@ -136,5 +137,10 @@ export default function WerewolfPage() {
       </p>
     )
   }
-  return <GameView key={id} gameId={id} />
+  return (
+    <>
+      {games?.length > 0 && <GameTabs games={games} selectedId={id} />}
+      <GameView key={id} gameId={id} />
+    </>
+  )
 }
