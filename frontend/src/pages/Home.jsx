@@ -29,6 +29,7 @@ function Home() {
   const [historicalTickData, setHistoricalTickData] = useState(null)
   const [selectedTickId, setSelectedTickId] = useState(null)
 
+  const townRef = useRef(null)
   const lastTickIdRef = useRef(null)
   const isLiveRef = useRef(true)
   const liveDayRef = useRef(null)
@@ -238,6 +239,7 @@ function Home() {
               instance={instance}
               locations={locations}
               tickData={tickData}
+              ref={townRef}
               onAgentChange={setSelectedAgent}
               className="max-lg:landscape:mx-0"
             />
@@ -262,7 +264,7 @@ function Home() {
         </div>
       </div>
       <aside className="border-t border-[#d4bc8a] p-4 lg:w-1/3 lg:border-l lg:border-t-0">
-        <AgentPanel agent={selectedAgent} />
+        <AgentPanel agent={selectedAgent} onClose={() => townRef.current?.deselect()} />
       </aside>
     </main>
   )
