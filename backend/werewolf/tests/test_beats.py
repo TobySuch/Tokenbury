@@ -320,3 +320,12 @@ def test_unknown_death_cause_is_a_generic_day_beat():
     beat = next(b for b in build_beats(game) if b["victim_id"] == victim.id)
     assert beat["kind"] == "morning"
     assert beat["text"] == f"{victim.name} died."
+
+
+def test_day_end_banner_then_next_night_counts_the_new_day():
+    game = new_game()
+    N = "night_wolf_chat"
+    ev(game, "phase_change", ENGINE, 1, "day_notes", **{"from": "day_notes", "to": "day_end"})  # fmt: skip
+    ev(game, "phase_change", ENGINE, 1, "day_end", **{"from": "day_end", "to": N})
+    got = [(b["banner"], b["palette"], b["day"]) for b in build_beats(game)][-2:]
+    assert got == [("Day 1: End of day", "day", 1), ("Night 2", "night", 2)]

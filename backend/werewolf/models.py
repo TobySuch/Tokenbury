@@ -39,6 +39,7 @@ class Game(models.Model):
         VOTE = "vote"
         ELIMINATION = "elimination"
         DAY_NOTES = "day_notes"
+        DAY_END = "day_end"
         GAME_OVER = "game_over"
 
     class Winner(models.TextChoices):

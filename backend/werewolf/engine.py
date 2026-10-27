@@ -645,7 +645,11 @@ def _day_notes(game, provider) -> None:
     if game.day_number >= game_config(game)["max_days"]:
         _end_game(game, Game.Winner.DRAW)
     else:
-        _transition(game, Phase.NIGHT_WOLF_CHAT, next_day=True)
+        _transition(game, Phase.DAY_END)
+
+
+def _day_end(game, provider) -> None:
+    _transition(game, Phase.NIGHT_WOLF_CHAT, next_day=True)
 
 
 HANDLERS = {
@@ -658,6 +662,7 @@ HANDLERS = {
     Phase.VOTE: _vote,
     Phase.ELIMINATION: _elimination,
     Phase.DAY_NOTES: _day_notes,
+    Phase.DAY_END: _day_end,
 }
 
 

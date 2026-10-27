@@ -71,7 +71,7 @@ class Command(BaseCommand):
         ) | GameEvent.objects.filter(
             game=game,
             type=GameEvent.Type.PHASE_CHANGE,
-            payload__to=Game.Phase.NIGHT_WOLF_CHAT,
+            payload__from=Game.Phase.DAY_NOTES,
         )
         latest = events.order_by("-seq").first()
         return (
