@@ -334,7 +334,7 @@ Oct 24, 2026. Extends the MVP. Where this section and the earlier ones disagree,
 
 ### Phase order
 
-`night_wolf_chat` → `night_doctor` → `night_lovers` → `night_seer` → `morning` → `discussion` → `vote` → `elimination` → `day_notes`. A step whose role holder is dead or absent is skipped with no agent call.
+`night_wolf_chat` → `night_doctor` → `night_lovers` → `night_seer` → `morning` → `discussion` → `vote` → `elimination` → `day_notes` → `day_end`. A step whose role holder is dead or absent is skipped with no agent call. Each `run_day` stops at `day_end` ("Day N: End of day"); the next run moves it to the following night and increments the day.
 
 ### Visibility changes
 

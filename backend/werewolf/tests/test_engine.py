@@ -112,14 +112,14 @@ def test_run_day_noop_when_not_active():
 # ------------------------------------------------------------- day flow
 
 
-def test_full_day_runs_to_next_night():
+def test_full_day_runs_to_end_of_day():
     game = new_game()
     wolf = by_role(game, "wolf")[0]
     victim = non_wolves(game)[0]
     run_day(game, Controlled(game, kill=victim))
     game = fresh(game)
     assert game.status == "active"
-    assert game.day_number == 2 and game.phase == "night_wolf_chat"
+    assert game.day_number == 1 and game.phase == "day_end"
     (death,) = [e for e in death_events(game) if e.payload["cause"] == "night_kill"]
     assert death.payload["player_id"] == victim.id
     assert death.payload["role"] == victim.role
@@ -139,7 +139,7 @@ def test_full_day_runs_to_next_night():
         ("discussion", "vote"),
         ("vote", "elimination"),
         ("elimination", "day_notes"),
-        ("day_notes", "night_wolf_chat"),
+        ("day_notes", "day_end"),
     ]
     assert {e.visibility for e in events_of(game, type="phase_change")} == {"engine"}
     seqs = [e.seq for e in events_of(game)]
@@ -497,8 +497,25 @@ def test_llm_errors_fall_back_not_crash():
 
     run_day(game, BoomProvider())
     game = fresh(game)
-    assert game.status == "active" and game.day_number == 2
+    assert game.status == "active" and game.phase == "day_end"
     assert events_of(game, type="wolf_target")[0].payload["source"] == "engine_random"
+
+
+def test_run_day_from_day_end_starts_the_next_night_and_plays_it():
+    game = new_game()
+    provider = Controlled(game, kill=non_wolves(game)[0])
+    run_day(game, provider)
+    run_day(game, provider)
+    game = fresh(game)
+    assert game.status == "finished" or (
+        game.day_number == 2 and game.phase == "day_end"
+    )
+    (start,) = [
+        e
+        for e in events_of(game, type="phase_change")
+        if e.payload["from"] == "day_end"
+    ]
+    assert start.payload["to"] == "night_wolf_chat" and start.day == 1
 
 
 def test_agreed_target_ignores_messages_without_a_target():

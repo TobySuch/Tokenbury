@@ -157,7 +157,7 @@ def test_log_window_day_two_prompts_have_no_day_one_events():
     capture = CapturingProvider(ScriptedProvider(game))
     run_day(game, capture)
     game.refresh_from_db()
-    assert game.status == "active" and game.day_number == 2
+    assert game.status == "active" and game.phase == "day_end"
     day1_tokens = [event_token(e) for e in events_of(game, day=1) if event_token(e)]
     day1_prompts = len(capture.player_prompts)
     run_day(game, capture)

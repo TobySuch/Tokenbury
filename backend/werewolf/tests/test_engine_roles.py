@@ -5,6 +5,7 @@ import pytest
 from werewolf.engine import (
     ScriptedProvider,
     _check_win,
+    _day_end,
     run_day,
     validation_context,
 )
@@ -40,6 +41,11 @@ def kill(*players):
 def fresh(game):
     game.refresh_from_db()
     return game
+
+
+def next_night(game):
+    _day_end(game, None)
+    return fresh(game)
 
 
 class Cast(ScriptedProvider):
@@ -119,7 +125,7 @@ def test_doctor_saves_the_target():
     (save,) = events_of(game, type="save_result")
     assert save.payload == {"saved": True}
     assert save.visibility == f"player:{doctor.id}" and save.actor is None
-    assert game.day_number == 2
+    assert game.phase == "day_end"
 
 
 def test_failed_protection_reports_false_and_victim_dies():
@@ -172,7 +178,7 @@ def test_validation_context_last_protected_and_lover_flag():
     link(villager, seer)
     assert validation_context(game, doctor, "doctor").last_protected is None
     run_day(game, Cast(game, kill=by_role(game, "villager")[1], protects={1: seer}))
-    game = fresh(game)
+    game = next_night(game)
     ctx = validation_context(game, Player.objects.get(pk=doctor.pk), "doctor")
     assert ctx.last_protected == seer.name
     assert validation_context(game, villager, "lovers_chat").actor_is_lover
@@ -187,7 +193,7 @@ def test_last_protected_clears_after_a_pass():
     run_day(game, provider)
     provider.protects = {}
     run_day(game, provider)  # passes on day 2
-    game = fresh(game)
+    game = next_night(game)
     ctx = validation_context(game, Player.objects.get(pk=doctor.pk), "doctor")
     assert ctx.last_protected is None
 
@@ -297,7 +303,7 @@ def test_lovers_chat_skipped_when_lovers_are_off():
     assert [
         e for e in events_of(game, phase="night_lovers") if e.type != "phase_change"
     ] == []
-    assert game.day_number == 2
+    assert game.phase == "day_end"
 
 
 # --------------------------------------------------------- heartbreak
@@ -479,7 +485,7 @@ def test_twelve_player_game_plays_a_day():
     game = new_game(player_count=12)
     assert game.players.filter(role="wolf").count() == 3
     run_day(game, ScriptedProvider(game))
-    assert fresh(game).day_number >= 2 or fresh(game).status == "finished"
+    assert fresh(game).phase == "day_end" or fresh(game).status == "finished"
 
 
 @pytest.mark.parametrize("players", range(5, 13))

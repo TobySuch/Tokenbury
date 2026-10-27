@@ -122,7 +122,7 @@ def test_run_day_skips_finished_games(db):
     game = create_classic_game(seed=2, published=True)
     call_command("run_day", "--scripted")
     game.refresh_from_db()
-    assert game.day_number == 2 and game.phase == "night_wolf_chat"
+    assert game.day_number == 1 and game.phase == "day_end"
     old.refresh_from_db()
     assert not GameEvent.objects.filter(game=old, type="wolf_message").exists()
 
@@ -137,7 +137,7 @@ def test_run_day_default_runs_all_published_active_games(db):
     call_command("run_day", "--scripted")
     for game in (first, second):
         game.refresh_from_db()
-        assert game.day_number == 2 and game.phase == "night_wolf_chat"
+        assert game.day_number == 1 and game.phase == "day_end"
     assert not GameEvent.objects.filter(game=finished, type="wolf_message").exists()
 
 
@@ -151,8 +151,7 @@ def test_if_due_is_checked_per_game(db, monkeypatch, settings, capsys):
     call_command("run_day", "--scripted", "--if-due")
     played.refresh_from_db()
     fresh.refresh_from_db()
-    assert played.day_number == 2
-    assert fresh.day_number == 2
+    assert played.phase == fresh.phase == "day_end"
     assert f"game {played.pk} not due" in capsys.readouterr().out.lower()
 
 
@@ -162,7 +161,7 @@ def test_run_day_game_option(db):
     create_classic_game(seed=2)
     call_command("run_day", "--scripted", "--game", str(first.pk))
     first.refresh_from_db()
-    assert first.day_number == 2
+    assert first.phase == "day_end"
 
 
 def test_run_day_unknown_game(db):
@@ -194,11 +193,11 @@ def test_if_due_runs_after_hour_then_skips_when_already_run_today(
     at_hour(monkeypatch, 10)
     call_command("run_day", "--scripted", "--if-due")
     game.refresh_from_db()
-    assert game.day_number == 2
+    assert game.phase == "day_end"
     calls = AgentCall.objects.count()
     call_command("run_day", "--scripted", "--if-due")
     game.refresh_from_db()
-    assert game.day_number == 2 and AgentCall.objects.count() == calls
+    assert game.phase == "day_end" and AgentCall.objects.count() == calls
     assert "already" in capsys.readouterr().out.lower()
 
 
@@ -213,7 +212,7 @@ def test_if_due_runs_again_next_day(db, monkeypatch, settings):
     )
     call_command("run_day", "--scripted", "--if-due")
     game.refresh_from_db()
-    assert game.day_number == 3 or game.status == "finished"
+    assert game.day_number == 2 or game.status == "finished"
 
 
 def test_create_game_command_is_unpublished_unless_publish_flag(db):
@@ -233,7 +232,7 @@ def test_run_day_default_ignores_unpublished_games(db, capsys):
     call_command("run_day", "--scripted")
     live.refresh_from_db()
     draft.refresh_from_db()
-    assert live.day_number == 2
+    assert live.phase == "day_end"
     assert draft.day_number == 1
     assert not GameEvent.objects.filter(game=draft, type="wolf_message").exists()
 
@@ -252,7 +251,7 @@ def test_run_day_game_option_can_run_an_unpublished_game(db):
     draft = create_classic_game(seed=2)
     call_command("run_day", "--scripted", "--game", str(draft.pk))
     draft.refresh_from_db()
-    assert draft.day_number == 2
+    assert draft.phase == "day_end"
 
 
 def test_run_hour_defaults_to_midnight():
@@ -267,4 +266,4 @@ def test_if_due_runs_just_after_midnight_by_default(db, monkeypatch):
     at_hour(monkeypatch, 0)
     call_command("run_day", "--scripted", "--if-due")
     game.refresh_from_db()
-    assert game.day_number == 2
+    assert game.phase == "day_end"

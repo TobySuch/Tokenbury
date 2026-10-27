@@ -25,6 +25,7 @@ BANNERS = {
     Phase.VOTE: "Day {day}: Vote",
     Phase.ELIMINATION: "Day {day}: Elimination",
     Phase.DAY_NOTES: "Day {day}: Notes",
+    Phase.DAY_END: "Day {day}: End of day",
 }
 
 
@@ -100,7 +101,11 @@ def build_beats(game) -> list[dict]:
     for e in events:
         p = e.payload
         if e.type == "phase_change":
-            if p["from"] == Phase.DAY_NOTES:
+            # Games from before day_end went straight from notes to night.
+            if p["to"] == Phase.NIGHT_WOLF_CHAT and p["from"] in (
+                Phase.DAY_NOTES,
+                Phase.DAY_END,
+            ):
                 state["day"] = e.day + 1
             else:
                 state["day"] = e.day
